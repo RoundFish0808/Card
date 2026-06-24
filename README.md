@@ -1,6 +1,8 @@
 # Card
 
-一个基于 Unity 2022.3 的扑克牌原型工程。当前版本已经完成了卡牌数据建模、牌堆创建与洗牌、玩家抽 3 张牌，以及通过预制体把手牌显示到场景中的基础流程。
+项目代号：金海豚。
+
+这是一个基于 Unity 2022.3 的扑克牌原型工程。当前版本已经完成了卡牌数据建模、牌堆创建与洗牌、玩家抽 3 张牌，以及通过预制体把手牌显示到场景中的基础流程。
 
 ## 当前实现
 
@@ -24,23 +26,23 @@
 
 ```text
 Assets/
-├─ Prefab/
-│  └─ CardPrefab/
-│     └─ CardPrefab.prefab
-├─ Scenes/
-│  └─ SampleScene.unity
-└─ Scripts/
-   ├─ Data/
-   │  ├─ CardData.cs
-   │  ├─ CardDataSO.cs
-   │  └─ CardEnums.cs
-   ├─ Manager/
-   │  └─ CardManager.cs
-   ├─ SOData/
-   │  └─ CardData.asset
-   └─ View/
-      └─ Prefab/
-         └─ CardView.cs
+|-- Prefab/
+|   `-- CardPrefab/
+|       `-- CardPrefab.prefab
+|-- Scenes/
+|   `-- SampleScene.unity
+`-- Scripts/
+    |-- Data/
+    |   |-- CardData.cs
+    |   |-- CardDataSO.cs
+    |   `-- CardEnums.cs
+    |-- Manager/
+    |   `-- CardManager.cs
+    |-- SOData/
+    |   `-- CardData.asset
+    `-- View/
+        `-- Prefab/
+            `-- CardView.cs
 ```
 
 ## 运行环境
