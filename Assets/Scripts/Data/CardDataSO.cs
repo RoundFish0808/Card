@@ -3,15 +3,15 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "CardData", menuName = "Card/Card Data")]
 public class CardDataSO : ScriptableObject
 {
-    [Header("»ù´¡ĞÅÏ¢")]
+    [Header("åŸºç¡€ä¿¡æ¯")]
     public int id;
     public string cardName;
 
-    [Header("¿¨ÅÆÊôĞÔ")]
+    [Header("å¡ç‰Œå±æ€§")]
     public Suit suit;
     public Rank rank;
 
-    [Header("ÅÆÃæÍ¼Æ¬")]
+    [Header("ç‰Œé¢å›¾ç‰‡")]
     public Sprite cardSprite;
 
     public CardType GetCardType()

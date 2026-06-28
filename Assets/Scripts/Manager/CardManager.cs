@@ -3,24 +3,32 @@ using UnityEngine;
 
 public class CardManager : MonoBehaviour
 {
-    [Header("ËùÓĞ¿¨ÅÆÊı¾İ£¬·Å 52 ¸ö CardDataSO")]
+    [Header("å…¨éƒ¨å¡ç‰Œæ•°æ®ï¼ˆå…± 52 å¼  CardDataSOï¼‰")]
     public List<CardDataSO> allCards = new List<CardDataSO>();
 
-    [Header("Í¨ÓÃ¿¨ÅÆÔ¤ÖÆÌå")]
+    [Header("é€šç”¨å¡ç‰Œé¢„åˆ¶ä½“")]
     public GameObject cardPrefab;
 
-    [Header("Íæ¼ÒÊÖÅÆ¿¨²Û")]
+    [Header("ç©å®¶å¡ç‰Œæ§½ä½ï¼ˆæ—§ç‰ˆæ°´å¹³æ’åˆ—ï¼‰")]
     public Transform[] playerCardSlots;
+
+    [Header("å¼§å½¢æ‰‹ç‰Œæ§åˆ¶å™¨")]
+    [Tooltip("ä½¿ç”¨æ ·æ¡æ›²çº¿æ€è·¯å®ç°çš„å¼§å½¢æ‰‹ç‰Œæ§åˆ¶å™¨")]
+    public HandController handController;
+
+    [Header("æ˜¯å¦ä½¿ç”¨å¼§å½¢æ‰‹ç‰Œ")]
+    public bool useArcHand = true;
 
     private List<CardDataSO> deck = new List<CardDataSO>();
     private List<CardDataSO> playerHand = new List<CardDataSO>();
+    private List<GameObject> playerHandObjects = new List<GameObject>();
 
     private void Start()
     {
         CreateDeck();
         ShuffleDeck();
 
-        DrawPlayerCards(3);
+        DrawPlayerCards(5);
         ShowPlayerCards();
     }
 
@@ -36,7 +44,7 @@ public class CardManager : MonoBehaviour
             }
         }
 
-        Debug.Log("ÅÆ¶ÑÉú³ÉÍê³É£¬ÊıÁ¿£º" + deck.Count);
+        Debug.Log("ç‰Œå †åˆ›å»ºå®Œæˆï¼Œæ€»ç‰Œæ•°ï¼š" + deck.Count);
     }
 
     private void ShuffleDeck()
@@ -55,7 +63,7 @@ public class CardManager : MonoBehaviour
     {
         if (deck.Count <= 0)
         {
-            Debug.LogWarning("ÅÆ¶Ñ¿ÕÁË");
+            Debug.LogWarning("ç‰Œå †ç©ºäº†");
             return null;
         }
 
@@ -76,7 +84,7 @@ public class CardManager : MonoBehaviour
             if (card != null)
             {
                 playerHand.Add(card);
-                Debug.Log("Íæ¼Ò³éµ½£º" + card.cardName);
+                Debug.Log("ç©å®¶æŠ½åˆ°ï¼š" + card.cardName);
             }
         }
     }
@@ -85,13 +93,49 @@ public class CardManager : MonoBehaviour
     {
         if (cardPrefab == null)
         {
-            Debug.LogError("CardManager Ã»ÓĞ°ó¶¨ cardPrefab");
+            Debug.LogError("CardManager æ²¡æœ‰æŒ‚ cardPrefab");
             return;
         }
 
-        if (playerCardSlots == null || playerCardSlots.Length < 3)
+        ClearPlayerHandObjects();
+
+        if (useArcHand && handController != null)
         {
-            Debug.LogError("Íæ¼ÒÊÖÅÆ¿¨²ÛÊıÁ¿²»×ã 3 ¸ö");
+            ShowPlayerCards_Arc();
+        }
+        else
+        {
+            ShowPlayerCards_Slots();
+        }
+    }
+
+    private void ShowPlayerCards_Arc()
+    {
+        for (int i = 0; i < playerHand.Count; i++)
+        {
+            GameObject cardObj = Instantiate(cardPrefab);
+            playerHandObjects.Add(cardObj);
+
+            CardView cardView = cardObj.GetComponent<CardView>();
+
+            if (cardView == null)
+            {
+                Debug.LogError("CardPrefab ä¸Šæ²¡æœ‰æŒ‚ CardView è„šæœ¬");
+                continue;
+            }
+
+            cardView.Init(playerHand[i]);
+            handController.AddCard(cardObj);
+        }
+
+        Debug.Log("å¼§å½¢æ‰‹ç‰Œæ˜¾ç¤ºå®Œæˆï¼Œå‰©ä½™ç‰Œå †ï¼š" + deck.Count);
+    }
+
+    private void ShowPlayerCards_Slots()
+    {
+        if (playerCardSlots == null || playerCardSlots.Length < playerHand.Count)
+        {
+            Debug.LogError("ç©å®¶å¡ç‰Œæ§½ä½æ•°é‡ä¸è¶³");
             return;
         }
 
@@ -101,11 +145,12 @@ public class CardManager : MonoBehaviour
 
             if (slot == null)
             {
-                Debug.LogError("µÚ " + i + " ¸öÍæ¼ÒÊÖÅÆ¿¨²ÛÎª¿Õ");
+                Debug.LogError("ç¬¬ " + i + " ä¸ªå¡ç‰Œæ§½ä½ä¸ºç©º");
                 continue;
             }
 
             GameObject cardObj = Instantiate(cardPrefab, slot);
+            playerHandObjects.Add(cardObj);
 
             RectTransform rect = cardObj.GetComponent<RectTransform>();
 
@@ -120,13 +165,63 @@ public class CardManager : MonoBehaviour
 
             if (cardView == null)
             {
-                Debug.LogError("CardPrefab ÉÏÃ»ÓĞ¹Ò CardView ½Å±¾");
+                Debug.LogError("CardPrefab ä¸Šæ²¡æœ‰æŒ‚ CardView è„šæœ¬");
                 continue;
             }
 
             cardView.Init(playerHand[i]);
         }
 
-        Debug.Log("Íæ¼ÒÊÖÅÆÏÔÊ¾Íê³É£¬Ê£ÓàÅÆ¶Ñ£º" + deck.Count);
+        Debug.Log("ç©å®¶æ‰‹ç‰Œæ˜¾ç¤ºå®Œæˆï¼Œå‰©ä½™ç‰Œå †ï¼š" + deck.Count);
+    }
+
+    private void ClearPlayerHandObjects()
+    {
+        if (useArcHand && handController != null)
+        {
+            handController.ClearCards();
+        }
+
+        foreach (var obj in playerHandObjects)
+        {
+            if (obj != null)
+                Destroy(obj);
+        }
+        playerHandObjects.Clear();
+    }
+
+    public void PlayCardFromHand(int index)
+    {
+        if (index < 0 || index >= playerHand.Count) return;
+
+        playerHand.RemoveAt(index);
+
+        if (useArcHand && handController != null && index < playerHandObjects.Count)
+        {
+            GameObject cardToRemove = playerHandObjects[index];
+            playerHandObjects.RemoveAt(index);
+            handController.RemoveCard(cardToRemove);
+            Destroy(cardToRemove);
+        }
+    }
+
+    public void DrawNewCard()
+    {
+        CardDataSO card = DrawCard();
+        if (card == null) return;
+
+        playerHand.Add(card);
+
+        GameObject cardObj = Instantiate(cardPrefab);
+        playerHandObjects.Add(cardObj);
+
+        CardView cardView = cardObj.GetComponent<CardView>();
+        if (cardView != null)
+            cardView.Init(card);
+
+        if (useArcHand && handController != null)
+        {
+            handController.AddCard(cardObj);
+        }
     }
 }
