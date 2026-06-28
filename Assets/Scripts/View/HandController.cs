@@ -69,11 +69,16 @@ public class HandController : MonoBehaviour
 
     private readonly List<GameObject> cards = new List<GameObject>();
     private readonly Dictionary<GameObject, Sequence> layoutSequences = new Dictionary<GameObject, Sequence>();
+    private readonly Dictionary<GameObject, CardView> cardViewCache = new Dictionary<GameObject, CardView>();
     private GameObject hoveredCard = null;
     private SplineContainer runtimeSpline;
 
     public IReadOnlyList<GameObject> Cards => cards.AsReadOnly();
     public int CardCount => cards.Count;
+
+    public event System.Action<CardView> OnCardClicked;
+    public event System.Action<CardView> OnCardPointerEnter;
+    public event System.Action<CardView> OnCardPointerExit;
 
     private void Awake()
     {
@@ -135,13 +140,21 @@ public class HandController : MonoBehaviour
     //添加一张卡牌到手牌布局,并为新的卡牌设置监听,更新布局
     public void AddCard(GameObject cardObj)
     {
+        AddCard(cardObj, true);
+    }
+
+    public void AddCard(GameObject cardObj, bool refreshLayout = true)
+    {
         if (cardObj == null) return;
 
         cardObj.transform.SetParent(transform, false);
         cards.Add(cardObj);
 
         SetupCardEvents(cardObj);
-        UpdateCardLayout();
+        SetupCardViewEvents(cardObj);
+
+        if (refreshLayout)
+            UpdateCardLayout();
     }
 
     public void RemoveCard(GameObject cardObj)
@@ -154,7 +167,15 @@ public class HandController : MonoBehaviour
         KillCardLayoutTween(cardObj);
         layoutSequences.Remove(cardObj);//清楚字典动画序列
 
+        UnregisterCardViewEvents(cardObj);
+        cardViewCache.Remove(cardObj);
+
         cards.Remove(cardObj);//清除列表卡牌对象
+        UpdateCardLayout();
+    }
+
+    public void RefreshLayout()
+    {
         UpdateCardLayout();
     }
 
@@ -276,7 +297,7 @@ public class HandController : MonoBehaviour
             {
                 eventID = EventTriggerType.PointerEnter
             };
-            enterEntry.callback.AddListener((data) => {OnCardPointerEnter(cardObj);
+            enterEntry.callback.AddListener((data) => {HandleHoverEnter(cardObj);
             Debug.Log($"PointerEnter");
             });
             trigger.triggers.Add(enterEntry);
@@ -288,14 +309,55 @@ public class HandController : MonoBehaviour
             {
                 eventID = EventTriggerType.PointerExit
             };
-            exitEntry.callback.AddListener((data) => {OnCardPointerExit(cardObj);
+            exitEntry.callback.AddListener((data) => {HandleHoverExit(cardObj);
             Debug.Log($"PointerExit");
             });
             trigger.triggers.Add(exitEntry);
         }
     }
 
-    private void OnCardPointerEnter(GameObject cardObj)
+    private void SetupCardViewEvents(GameObject cardObj)
+    {
+        CardView cardView = cardObj.GetComponent<CardView>();
+        if (cardView == null)
+            cardView = cardObj.GetComponentInChildren<CardView>();
+
+        if (cardView == null) return;
+
+        cardViewCache[cardObj] = cardView;
+        cardView.OnClicked += HandleCardViewClicked;
+        cardView.OnPointerEnterEvent += HandleCardViewPointerEnter;
+        cardView.OnPointerExitEvent += HandleCardViewPointerExit;
+    }
+
+    private void UnregisterCardViewEvents(GameObject cardObj)
+    {
+        if (cardViewCache.TryGetValue(cardObj, out var cardView) && cardView != null)
+        {
+            cardView.OnClicked -= HandleCardViewClicked;
+            cardView.OnPointerEnterEvent -= HandleCardViewPointerEnter;
+            cardView.OnPointerExitEvent -= HandleCardViewPointerExit;
+        }
+    }
+
+    private void HandleCardViewClicked(CardView card)
+    {
+        OnCardClicked?.Invoke(card);
+    }
+
+    private void HandleCardViewPointerEnter(CardView card)
+    {
+        if (card != null && card.gameObject != null)
+            OnCardPointerEnter?.Invoke(card);
+    }
+
+    private void HandleCardViewPointerExit(CardView card)
+    {
+        if (card != null && card.gameObject != null)
+            OnCardPointerExit?.Invoke(card);
+    }
+
+    private void HandleHoverEnter(GameObject cardObj)
     {
         if (hoveredCard == cardObj) return;
 
@@ -303,7 +365,7 @@ public class HandController : MonoBehaviour
         UpdateCardLayout();
     }
 
-    private void OnCardPointerExit(GameObject cardObj)
+    private void HandleHoverExit(GameObject cardObj)
     {
         if (hoveredCard != cardObj) return;
 

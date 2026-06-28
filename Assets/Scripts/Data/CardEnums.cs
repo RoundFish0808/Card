@@ -1,18 +1,18 @@
 using UnityEngine;
 
 /// <summary>
-/// ÅÆµÄ»¨É«
+/// ï¿½ÆµÄ»ï¿½É«
 /// </summary>
 public enum Suit
 {
-    Spade,    // ºÚÌÒ
-    Heart,    // ºìÌÒ
-    Diamond,  // ·½¿é
-    Club      // Ã·»¨
+    Spade,    // ï¿½ï¿½ï¿½ï¿½
+    Heart,    // ï¿½ï¿½ï¿½ï¿½
+    Diamond,  // ï¿½ï¿½ï¿½ï¿½
+    Club      // Ã·ï¿½ï¿½
 }
 
 /// <summary>
-/// ÅÆµÄµãÊı
+/// ï¿½ÆµÄµï¿½ï¿½ï¿½
 /// </summary>
 public enum Rank
 {
@@ -32,7 +32,7 @@ public enum Rank
 }
 
 /// <summary>
-/// ¿¨ÅÆÀàĞÍ£ºÊı×ÖÅÆ / ÈËÍ·ÅÆ / A
+/// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ / ï¿½ï¿½Í·ï¿½ï¿½ / A
 /// </summary>
 public enum CardType
 {
@@ -42,7 +42,7 @@ public enum CardType
 }
 
 /// <summary>
-/// Õ½¶·½á¹û
+/// Õ½ï¿½ï¿½ï¿½ï¿½ï¿½
 /// </summary>
 public enum BattleResult
 {
@@ -52,21 +52,32 @@ public enum BattleResult
 }
 
 /// <summary>
-/// »¨É«Ğ§¹ûÃ¶¾Ù
+/// èŠ±è‰²ç‰¹æ•ˆæšä¸¾
 /// </summary>
 public enum SuitEffectType
 {
     None,
 
-    // ºÚÌÒ£ºÊ¤ÀûÊ±²îÖµ·­±¶
+    // é»‘æ¡ƒï¼šèƒœæ—¶å·®å€¼ç¿»å€
     WinDifferenceMultiplier,
 
-    // ºìÌÒ£ºÊ§°ÜÊ±»ù´¡·Ö +1(Ö»¼ÓÒ»·Ö)
+    // çº¢æ¡ƒï¼šè´¥æ—¶åŸºæœ¬åˆ†+1(åªæœ‰ä¸€æ¬¡)
     LoseBaseBonus,
 
-    // ·½¿é£º³é1Æú1
+    // æ–¹å—ï¼šæŠ½1å¼ƒ1
     DrawAndDiscard,
 
-    // Ã·»¨£ºÊ§°ÜÊ±»ñµÃÒ»°ë²îÖµ (ÏòÉÏÈ¡ÕûËÄÉáÎåÈë)
+    // æ¢…èŠ±ï¼šè´¥æ—¶å·®å€¼åˆ†æ‹¿ä¸€åŠ (å–æ•´)
     LoseDifferenceBonus
+}
+
+/// <summary>
+/// AIéš¾åº¦ç­‰çº§
+/// </summary>
+public enum AIDifficulty
+{
+    Easy,       // ä¿¡æ¯é‡ç­‰çº§ 3ï¼ˆé€éœ²æœ€å¤šï¼‰
+    Normal,     // ä¿¡æ¯é‡ç­‰çº§ 2
+    Hard,       // ä¿¡æ¯é‡ç­‰çº§ 1
+    Nightmare   // ä¿¡æ¯é‡ç­‰çº§ 0ï¼ˆå‡ ä¹ä¸é€éœ²ï¼‰
 }
