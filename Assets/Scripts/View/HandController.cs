@@ -76,6 +76,7 @@ public class HandController : MonoBehaviour
         EnsureSplineContainer();
     }
 
+    //确保样条曲线容器存在,不存在则创建一条
     private void EnsureSplineContainer()
     {
         if (splineContainer != null) return;
@@ -90,6 +91,7 @@ public class HandController : MonoBehaviour
         CreateArcSpline(runtimeSpline.Spline);
     }
 
+    //初始化失败创造弧形曲线
     private void CreateArcSpline(Spline spline)
     {
         spline.Clear();
@@ -126,6 +128,7 @@ public class HandController : MonoBehaviour
         spline.Closed = false;
     }
 
+    //添加一张卡牌到手牌布局,并为新的卡牌设置监听,更新布局
     public void AddCard(GameObject cardObj)
     {
         if (cardObj == null) return;
@@ -145,12 +148,13 @@ public class HandController : MonoBehaviour
             hoveredCard = null;
 
         KillCardLayoutTween(cardObj);
-        layoutSequences.Remove(cardObj);
+        layoutSequences.Remove(cardObj);//清楚字典动画序列
 
-        cards.Remove(cardObj);
+        cards.Remove(cardObj);//清除列表卡牌对象
         UpdateCardLayout();
     }
 
+    //清除所有卡牌,并销毁所有卡牌对象
     public void ClearCards()
     {
         foreach (var kvp in layoutSequences)
@@ -169,6 +173,7 @@ public class HandController : MonoBehaviour
         hoveredCard = null;
     }
 
+    //更新布局
     public void UpdateCardLayout()
     {
         int count = cards.Count;
@@ -184,13 +189,16 @@ public class HandController : MonoBehaviour
             RectTransform rect = card.GetComponent<RectTransform>();
             if (rect == null) continue;
 
+            //计算当前卡牌在样条曲线上的位置比例,一张卡牌在中间
             float t = count == 1
                 ? Mathf.Lerp(startNormalizedPos, endNormalizedPos, 0.5f)
                 : Mathf.Lerp(startNormalizedPos, endNormalizedPos, (float)i / (count - 1));
-
+            
+            //获取当前卡牌目标位置
             Vector3 targetPos = EvaluateSplinePosition(t);
             Quaternion targetRot = orientToTangent ? EvaluateSplineRotation(t) : Quaternion.identity;
 
+            //判断是否悬停在当前卡牌上,悬停卡牌有一个向上位置偏移
             bool isHovered = hoveredCard == card;
             if (isHovered)
             {
@@ -198,9 +206,12 @@ public class HandController : MonoBehaviour
             }
             Vector3 targetScale = isHovered ? Vector3.one * hoverScale : Vector3.one;
 
+            //设置卡牌兄弟索引,悬停卡牌停留最后,SiblingIndex = 在父物体下面排列的位置,原理:选中的话就停留在最后保持视觉最上层,如果没选中就按顺序
             int siblingIndex = isHovered ? count : i;
+            //Hover 的牌永远在最上层
             rect.SetSiblingIndex(siblingIndex);
-
+            
+            //如果有动画优先动画效果
             if (useAnimation && Application.isPlaying)
             {
                 float delay = i * cardAnimationDelay;
@@ -215,12 +226,13 @@ public class HandController : MonoBehaviour
         }
     }
 
+    //根据t值计算样条曲线上的位置
     private Vector3 EvaluateSplinePosition(float t)
     {
         if (splineContainer == null || splineContainer.Spline == null)
             return Vector3.zero;
 
-        SplineUtility.Evaluate(splineContainer.Spline, t, out var position, out _, out _);
+        SplineUtility.Evaluate(splineContainer.Spline, t, out var position, out _, out _);//这里只要pos其他的不要
         return new Vector3(position.x, position.y, position.z);
     }
 
@@ -237,6 +249,7 @@ public class HandController : MonoBehaviour
         return Quaternion.Euler(0f, 0f, -angle + tangentRotationOffset);
     }
 
+    //设置卡牌事件监听
     private void SetupCardEvents(GameObject cardObj)
     {
         EventTrigger trigger = cardObj.GetComponent<EventTrigger>();
@@ -245,12 +258,14 @@ public class HandController : MonoBehaviour
 
         bool hasEnter = false;
         bool hasExit = false;
+        //检查这个卡牌的 EventTrigger 里，PointerEnter / PointerExit 事件有没有已经被绑定过，避免重复添加
         foreach (var entry in trigger.triggers)
         {
             if (entry.eventID == EventTriggerType.PointerEnter) hasEnter = true;
             if (entry.eventID == EventTriggerType.PointerExit) hasExit = true;
         }
 
+        //设置监听类型和回调方法
         if (!hasEnter)
         {
             EventTrigger.Entry enterEntry = new EventTrigger.Entry
@@ -288,6 +303,7 @@ public class HandController : MonoBehaviour
         UpdateCardLayout();
     }
 
+    //用 DOTween 给“卡牌 UI”做一个带延迟的布局动画
     private void StartLayoutAnimation(GameObject cardObj, RectTransform rect, Vector3 targetPos, Quaternion targetRot, Vector3 targetScale, float delay)
     {
         if (layoutSequences.TryGetValue(cardObj, out var existing))
@@ -314,6 +330,7 @@ public class HandController : MonoBehaviour
         layoutSequences[cardObj] = seq;
     }
 
+    //取消卡牌布局动画
     private void KillCardLayoutTween(GameObject cardObj)
     {
         if (layoutSequences.TryGetValue(cardObj, out var layoutSeq) && layoutSeq != null)
@@ -343,6 +360,7 @@ public class HandController : MonoBehaviour
         DOTween.Kill(this);
     }
 
+    //在 Scene视图绘制Spline曲线
     private void OnDrawGizmosSelected()
     {
         if (splineContainer == null || splineContainer.Spline == null) return;
