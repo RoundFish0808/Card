@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using UnityEngine;
 using UnityEditor;
+using UnityEngine.UI;
 
 [CustomEditor(typeof(HandController))]
 public class HandControllerEditor : Editor
@@ -72,12 +73,30 @@ public class HandControllerEditor : Editor
 
         for (int i = 0; i < count; i++)
         {
-            GameObject cardObj = new GameObject("Card_" + i);
-            RectTransform rect = cardObj.AddComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(100, 150);
+            GameObject cardObj;
 
-            cardObj.AddComponent<CardView>();
+            if (handController.debugCardPrefab != null)
+            {
+                cardObj = Instantiate(handController.debugCardPrefab);
+            }
+            else
+            {
+                cardObj = new GameObject("Card_" + i);
+                RectTransform rect = cardObj.AddComponent<RectTransform>();
+                rect.sizeDelta = new Vector2(100, 150);
 
+                Image img = cardObj.AddComponent<Image>();
+                img.color = new Color(1f, 1f, 1f, 0.5f);
+
+                Text txt = cardObj.AddComponent<Text>();
+                txt.text = "Card " + i;
+                txt.alignment = TextAnchor.MiddleCenter;
+                txt.color = Color.black;
+
+                cardObj.AddComponent<CardView>();
+            }
+
+            cardObj.name = "Card_" + i;
             handController.AddCard(cardObj);
         }
 

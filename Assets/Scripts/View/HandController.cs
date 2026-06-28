@@ -63,6 +63,10 @@ public class HandController : MonoBehaviour
     [Tooltip("布局动画缓动类型")]
     public Ease layoutEase = Ease.OutCubic;
 
+    [Header("测试/调试")]
+    [Tooltip("调试用卡牌预制体。在编辑器中点击「生成测试卡牌」时会实例化此预制体")]
+    public GameObject debugCardPrefab;
+
     private readonly List<GameObject> cards = new List<GameObject>();
     private readonly Dictionary<GameObject, Sequence> layoutSequences = new Dictionary<GameObject, Sequence>();
     private GameObject hoveredCard = null;
@@ -272,7 +276,9 @@ public class HandController : MonoBehaviour
             {
                 eventID = EventTriggerType.PointerEnter
             };
-            enterEntry.callback.AddListener((data) => OnCardPointerEnter(cardObj));
+            enterEntry.callback.AddListener((data) => {OnCardPointerEnter(cardObj);
+            Debug.Log($"PointerEnter");
+            });
             trigger.triggers.Add(enterEntry);
         }
 
@@ -282,7 +288,9 @@ public class HandController : MonoBehaviour
             {
                 eventID = EventTriggerType.PointerExit
             };
-            exitEntry.callback.AddListener((data) => OnCardPointerExit(cardObj));
+            exitEntry.callback.AddListener((data) => {OnCardPointerExit(cardObj);
+            Debug.Log($"PointerExit");
+            });
             trigger.triggers.Add(exitEntry);
         }
     }
