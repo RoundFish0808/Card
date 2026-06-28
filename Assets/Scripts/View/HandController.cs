@@ -71,6 +71,7 @@ public class HandController : MonoBehaviour
     private readonly Dictionary<GameObject, Sequence> layoutSequences = new Dictionary<GameObject, Sequence>();
     private readonly Dictionary<GameObject, CardView> cardViewCache = new Dictionary<GameObject, CardView>();
     private GameObject hoveredCard = null;
+    private bool isLayoutPaused = false;
     private SplineContainer runtimeSpline;
 
     public IReadOnlyList<GameObject> Cards => cards.AsReadOnly();
@@ -157,7 +158,7 @@ public class HandController : MonoBehaviour
             UpdateCardLayout();
     }
 
-    public void RemoveCard(GameObject cardObj)
+    public void RemoveCard(GameObject cardObj, bool refreshLayout = true)
     {
         if (cardObj == null) return;
 
@@ -171,7 +172,9 @@ public class HandController : MonoBehaviour
         cardViewCache.Remove(cardObj);
 
         cards.Remove(cardObj);//清除列表卡牌对象
-        UpdateCardLayout();
+
+        if (refreshLayout)
+            UpdateCardLayout();
     }
 
     public void RefreshLayout()
@@ -201,6 +204,8 @@ public class HandController : MonoBehaviour
     //更新布局
     public void UpdateCardLayout()
     {
+        if (isLayoutPaused) return;
+
         int count = cards.Count;
         if (count == 0) return;
 
@@ -298,7 +303,7 @@ public class HandController : MonoBehaviour
                 eventID = EventTriggerType.PointerEnter
             };
             enterEntry.callback.AddListener((data) => {HandleHoverEnter(cardObj);
-            Debug.Log($"PointerEnter");
+            //Debug.Log($"PointerEnter");
             });
             trigger.triggers.Add(enterEntry);
         }
@@ -310,12 +315,13 @@ public class HandController : MonoBehaviour
                 eventID = EventTriggerType.PointerExit
             };
             exitEntry.callback.AddListener((data) => {HandleHoverExit(cardObj);
-            Debug.Log($"PointerExit");
+            //Debug.Log($"PointerExit");
             });
             trigger.triggers.Add(exitEntry);
         }
     }
 
+    //卡牌视图事件监听
     private void SetupCardViewEvents(GameObject cardObj)
     {
         CardView cardView = cardObj.GetComponent<CardView>();
@@ -357,9 +363,34 @@ public class HandController : MonoBehaviour
             OnCardPointerExit?.Invoke(card);
     }
 
+    /// <summary>
+    /// 暂停布局刷新（拖拽开始时调用
+    /// </summary>
+    public void PauseLayout()
+    {
+        isLayoutPaused = true;
+
+        foreach (var sequence in new List<Sequence>(layoutSequences.Values))
+        {
+            if (sequence != null)
+                sequence.Kill(false);
+        }
+    }
+
+    /// <summary>
+    /// 恢复布局刷新（拖拽结束时调用，可选立即刷新
+    /// </summary>
+    public void ResumeLayout(bool refreshImmediate = true)
+    {
+        isLayoutPaused = false;
+        if (refreshImmediate)
+            UpdateCardLayout();
+    }
+
     private void HandleHoverEnter(GameObject cardObj)
     {
         if (hoveredCard == cardObj) return;
+        if (isLayoutPaused) return;
 
         hoveredCard = cardObj;
         UpdateCardLayout();

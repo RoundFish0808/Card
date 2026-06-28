@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using System;
+using DG.Tweening;
 
 public class CardView : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
 {
@@ -17,17 +18,43 @@ public class CardView : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
     [Header("选中高亮")]
     public GameObject selectedHighlight;
 
+    [Header("归属方（用于判断显示哪一面）")]
+    public bool isPlayerCard = true;
+
+    [Header("放置后的目标缩放（再次选中时切换）")]
+    [Tooltip("放置后的基础缩放，再次选中时会被乘以选中缩放")]
+    public float placedBaseScale = 1f;
+    [Tooltip("再次选中已放置的卡牌时，缩放变为 placedBaseScale * placedSelectedScale")]
+    public float placedSelectedScale = 1.1f;
+
     private CardDataSO cardData;
     private bool isRevealed = true;
     private bool isSelected = false;
+    private CardState currentState = CardState.InHand;
 
     public event Action<CardView> OnClicked;
     public event Action<CardView> OnPointerEnterEvent;
     public event Action<CardView> OnPointerExitEvent;
 
+    public event Action<CardView, CardState> OnStateChanged;
+
     public CardDataSO CardData => cardData;
     public bool IsRevealed => isRevealed;
     public bool IsSelected => isSelected;
+    public CardState CurrentState => currentState;
+
+    /// <summary>
+    /// 当前应该使用的目标缩放（已放置：基础/选中态切换；手牌：1）
+    /// </summary>
+    public float PlacedScale
+    {
+        get
+        {
+            if (currentState == CardState.Placed)
+                return isSelected ? placedBaseScale * placedSelectedScale : placedBaseScale;
+            return 1f;
+        }
+    }
 
     private void Awake()
     {
@@ -100,35 +127,91 @@ public class CardView : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
             cardNameText.text = cardData.cardName;
     }
 
+    /// <summary>
+    /// 翻到正面
+    /// </summary>
     public void Reveal()
     {
         isRevealed = true;
         UpdateVisual();
     }
 
+    /// <summary>
+    /// 翻到背面
+    /// </summary>
     public void Hide()
     {
         isRevealed = false;
         UpdateVisual();
     }
 
+    /// <summary>
+    /// 设置选中状态
+    /// 已放置的卡牌：选中时只调整 scale，不改变位置
+    /// </summary>
     public void SetSelected(bool selected)
     {
         isSelected = selected;
         if (selectedHighlight != null)
             selectedHighlight.SetActive(selected);
+
+        // 已放置的卡牌：选中时调整 scale（不放回手牌位置）
+        if (currentState == CardState.Placed)
+        {
+            RectTransform cardRect = GetComponent<RectTransform>();
+            if (cardRect != null)
+            {
+                DOTween.Kill(cardRect, false);
+                float targetScale = PlacedScale;
+                cardRect.DOScale(new Vector3(targetScale, targetScale, 1f), 0.15f).SetEase(Ease.OutBack);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 设置卡牌状态
+    /// </summary>
+    public void SetState(CardState newState)
+    {
+        if (currentState == newState) return;
+
+        CardState oldState = currentState;
+        currentState = newState;
+
+        OnStateChanged?.Invoke(this, newState);
+
+        UpdateVisual();
+    }
+
+    /// <summary>
+    /// 获取战斗值（用于 AI 评估最强牌）
+    /// </summary>
+    public int GetBattleValue()
+    {
+        if (cardData == null) return 0;
+        return cardData.GetBattleValue();
     }
 
     private void UpdateVisual()
     {
+        bool showFront = isRevealed;
+
+        // 放置在槽位中时：
+        // - 玩家的牌：显示正面（玩家自己能看到）
+        // - NPC的牌：显示背面（玩家看不到）
+        if (currentState == CardState.Placed)
+        {
+            showFront = isPlayerCard;
+        }
+
         if (cardBack != null)
-            cardBack.SetActive(!isRevealed);
+            cardBack.SetActive(!showFront);
 
         if (cardImage != null)
-            cardImage.enabled = isRevealed;
+            cardImage.enabled = showFront;
 
         if (cardNameText != null)
-            cardNameText.enabled = isRevealed;
+            cardNameText.enabled = showFront;
     }
 
     public void OnPointerClick(PointerEventData eventData)

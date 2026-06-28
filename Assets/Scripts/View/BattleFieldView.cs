@@ -10,29 +10,47 @@ public class BattleFieldView : MonoBehaviour
     [Header("NPC槽位 (3个)")]
     public SlotView[] npcSlots;
 
-    [Header("是否是玩家回合")]
+    [Header("攻击系统")]
+    public AttackSystem attackSystem;
+
+    [Header("默认模式：放置/攻击")]
+    public bool defaultIsPlacementMode = true;
+
     public bool isPlayerTurn = true;
+    public bool isPlacementMode = true;  // true=放置模式 false=攻击模式
 
     public event Action<int, CardView> OnPlayerPlacedCard;
 
     private CardView selectedCard;
 
     private void Awake()
-    {
+    {   
+        //初始化槽模式
+        isPlacementMode = defaultIsPlacementMode;
+
+        //初始化  玩家槽 监听事件
         for (int i = 0; i < playerSlots.Length; i++)
         {
             playerSlots[i].slotIndex = i;
             playerSlots[i].isPlayerSlot = true;
-            playerSlots[i].OnSlotClicked += HandleSlotClicked;
+            playerSlots[i].OnSlotClicked += HandlePlayerSlotClicked;
             playerSlots[i].OnSlotEnter += HandleSlotEnter;
             playerSlots[i].OnSlotExit += HandleSlotExit;
+            playerSlots[i].OnCardPlaced += HandleCardPlacedToSlot;
         }
-
+        
+        //初始化  NPC槽 监听事件
         for (int i = 0; i < npcSlots.Length; i++)
         {
             npcSlots[i].slotIndex = i;
             npcSlots[i].isPlayerSlot = false;
+            npcSlots[i].OnSlotClicked += HandleEnemySlotClicked;
             npcSlots[i].SetInteractable(false);
+        }
+
+        if (attackSystem != null)
+        {
+            attackSystem.battleField = this;
         }
 
         SetSlotsInteractable(isPlayerTurn);
@@ -42,34 +60,91 @@ public class BattleFieldView : MonoBehaviour
     {
         foreach (var slot in playerSlots)
         {
-            slot.OnSlotClicked -= HandleSlotClicked;
+            slot.OnSlotClicked -= HandlePlayerSlotClicked;
             slot.OnSlotEnter -= HandleSlotEnter;
             slot.OnSlotExit -= HandleSlotExit;
+            slot.OnCardPlaced -= HandleCardPlacedToSlot;
+        }
+
+        foreach (var slot in npcSlots)
+        {
+            slot.OnSlotClicked -= HandleEnemySlotClicked;
         }
     }
 
+    //选择槽位卡片(在拖拽时会调用)
     public void SetSelectedCard(CardView card)
     {
         selectedCard = card;
     }
 
+    /// <summary>
+    /// 切换模式：放置模式 / 攻击模式
+    /// </summary>
+    public void SetMode(bool placementMode)
+    {
+        isPlacementMode = placementMode;
+
+        if (attackSystem != null)
+        {
+            if (!placementMode)
+            {
+                attackSystem.EnterAttackMode();
+            }
+            else
+            {
+                attackSystem.ExitAttackMode();
+            }
+        }
+
+        UpdateSlotInteractivity();
+    }
+
     public void SetSlotsInteractable(bool interactable)
     {
         isPlayerTurn = interactable;
+        UpdateSlotInteractivity();
+    }
+
+    private void UpdateSlotInteractivity()
+    {
         foreach (var slot in playerSlots)
         {
-            slot.SetInteractable(interactable);
+            slot.SetInteractable(isPlayerTurn);
+        }
+
+        // 敌方槽位只有在攻击模式下才可交互
+        foreach (var slot in npcSlots)
+        {
+            slot.SetInteractable(isPlayerTurn && !isPlacementMode);
         }
     }
 
-    private void HandleSlotClicked(SlotView slot)
+    // 玩家槽位被点击
+    private void HandlePlayerSlotClicked(SlotView slot)
     {
-        if (selectedCard == null) return;
-        if (slot.IsOccupied) return;
+        if (!isPlayerTurn) return;
 
-        slot.PlaceCard(selectedCard);
-        OnPlayerPlacedCard?.Invoke(slot.slotIndex, selectedCard);
-        selectedCard = null;
+        if (!isPlacementMode && attackSystem != null)
+        {
+            // 攻击模式：选择主攻牌
+            attackSystem.OnPlayerSlotClicked(slot);
+        }
+        else
+        {
+            // 放置模式：点击槽位没用（需要拖拽）
+        }
+    }
+
+    // 敌方槽位被点击
+    private void HandleEnemySlotClicked(SlotView slot)
+    {
+        if (!isPlayerTurn) return;
+        if (isPlacementMode) return;
+        if (attackSystem == null) return;
+
+        // 攻击模式：选择目标
+        attackSystem.OnEnemySlotClicked(slot);
     }
 
     private void HandleSlotEnter(SlotView slot)
@@ -81,6 +156,11 @@ public class BattleFieldView : MonoBehaviour
     private void HandleSlotExit(SlotView slot)
     {
         slot.SetHighlighted(false);
+    }
+
+    private void HandleCardPlacedToSlot(SlotView slot, CardView card)
+    {
+        OnPlayerPlacedCard?.Invoke(slot.slotIndex, card);
     }
 
     public void PlaceCardToNPCSlot(int slotIndex, CardView card, bool withAnimation = true)
@@ -143,6 +223,11 @@ public class BattleFieldView : MonoBehaviour
             if (!npcSlots[i].IsOccupied) list.Add(i);
         }
         return list;
+    }
+
+    public bool HasEmptyPlayerSlots()
+    {
+        return GetFirstEmptyPlayerSlot() >= 0;
     }
 
     public void ClearAllSlots()

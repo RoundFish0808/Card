@@ -81,3 +81,14 @@ public enum AIDifficulty
     Hard,       // 信息量等级 1
     Nightmare   // 信息量等级 0（几乎不透露）
 }
+
+/// <summary>
+/// 卡牌当前状态
+/// </summary>
+public enum CardState
+{
+    InHand,     // 在手牌中（可拖拽、可悬停、可选中）
+    Placed,     // 放置在槽位中（不可拖拽、可被选中攻击目标）
+    Dragging,   // 正在拖拽中
+    Discarded   // 已弃牌
+}
