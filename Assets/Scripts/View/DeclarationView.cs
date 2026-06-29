@@ -28,10 +28,19 @@ public class DeclarationView : MonoBehaviour
 
     private void Awake()
     {
+        AutoFindReferences();
+
+        if (bubbleRoot != null)
+            bubbleRoot.SetActive(false);
+    }
+
+    private void AutoFindReferences()
+    {
         if (bubbleRoot == null)
             bubbleRoot = gameObject;
 
-        bubbleRoot.SetActive(false);
+        if (declarationText == null)
+            declarationText = GetComponentInChildren<Text>();
     }
 
     public void ShowDeclaration(string text, float displayTime = -1f)

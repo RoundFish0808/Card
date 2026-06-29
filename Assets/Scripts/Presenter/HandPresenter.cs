@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System;
 
+//MVP 架构中的 Presenter 层,连接手牌视图 (HandController) 和 业务逻辑。
 public class HandPresenter : MonoBehaviour
 {
     [Header("视图")]

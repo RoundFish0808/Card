@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2d1a267351f94d82944beb490f6f41e, type: 3}
+  m_Name: AIDeclarationConfig
+  m_EditorClassIdentifier: 
+  PositionTemplates:
+  - "\u5DE6\u4E2D\u53F3\uFF0C{0}\u6700\u5F3A"
+  - "{0}\u8FD9\u5F20\u724C\uFF0C\u662F\u6211\u7684\u738B\u724C"
+  - "\u770B\u597D\u6211\u7684{0}\uFF01"
+  - "\u8FD9\u5C40\uFF0C{0}\u4F1A\u7ED9\u4F60\u60CA\u559C"
+  ValueTemplates:
+  - "\u6211\u624B\u91CC\u6709\u4E00\u5F20{0}"
+  - "\u8FD9\u5F20{0}\uFF0C\u4F60\u53EF\u8981\u5C0F\u5FC3\u4E86"
+  - "\u522B\u5C0F\u770B\u6211\u7684{0}"
+  - "\u6211\u6700\u597D\u7684\u724C\u662F{0}"
+  VagueTemplates:
+  - "\u2026\u2026\u51C6\u5907\u597D\u4E86\u5417\uFF1F"
+  - "\u8BA9\u6211\u770B\u770B\u4F60\u7684\u5B9E\u529B\u3002"
+  - "\u51FA\u62DB\u5427\u3002"
+  - "\u8FD9\u4E00\u5C40\uFF0C\u6211\u4E0D\u4F1A\u8F93\u3002"
+  - "\u6709\u70B9\u610F\u601D\u2026\u2026"
+  MinimalTemplates:
+  - "\u2026\u2026"
+  - "\u54FC\u3002"
+  - "\u6765\u5427\u3002"
+  - "\u522B\u5927\u610F\u3002"
