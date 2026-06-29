@@ -52,6 +52,7 @@ public class CardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, I
     private bool isDragging = false;
     private bool wasDragged = false;
     private HandController cachedHandController;
+    private SlotView currentHighlightedSlot;
 
     public bool IsDragging => isDragging;
     public bool WasDragged => wasDragged;
@@ -93,6 +94,50 @@ public class CardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, I
         {
             transform.position = worldPos + offset;
         }
+
+        // 实时检测并高亮最近的空槽位
+        UpdateSlotHighlight();
+    }
+
+    /// <summary>
+    /// 实时检测并高亮最近的空槽位
+    /// </summary>
+    private void UpdateSlotHighlight()
+    {
+        SlotView nearestSlot = FindNearestEmptySlot();
+
+        // 如果最近的槽位变了，取消之前的高亮
+        if (currentHighlightedSlot != null && currentHighlightedSlot != nearestSlot)
+        {
+            currentHighlightedSlot.SetHighlighted(false);
+            currentHighlightedSlot = null;
+        }
+
+        // 高亮新的最近槽位
+        if (nearestSlot != null && nearestSlot != currentHighlightedSlot)
+        {
+            nearestSlot.SetHighlighted(true);
+            currentHighlightedSlot = nearestSlot;
+        }
+    }
+
+    /// <summary>
+    /// 取消所有槽位高亮
+    /// </summary>
+    private void ClearAllHighlights()
+    {
+        if (currentHighlightedSlot != null)
+        {
+            currentHighlightedSlot.SetHighlighted(false);
+            currentHighlightedSlot = null;
+        }
+
+        // 取消所有槽位的高亮（清除 BattleFieldView 中可能的手动高亮）
+        SlotView[] allSlots = FindObjectsOfType<SlotView>();
+        foreach (var slot in allSlots)
+        {
+            slot.SetHighlighted(false);
+        }
     }
 
     public void OnBeginDrag(PointerEventData eventData)
@@ -104,6 +149,9 @@ public class CardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, I
             canvas = GetComponentInParent<Canvas>();
 
         if (canvas == null) return;
+
+        // 开始拖拽时清除所有槽位高亮
+        ClearAllHighlights();
 
         // 缓存 HandController 引用（拖拽过程中父物体可能变化，之后再找就找不到了）
         cachedHandController = GetComponentInParent<HandController>();
@@ -154,6 +202,9 @@ public class CardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, I
     {
         if (!isDragging) return;
         isDragging = false;
+
+        // 结束拖拽时清除所有槽位高亮
+        ClearAllHighlights();
 
         // 恢复 GraphicRaycaster
         if (canvas != null)

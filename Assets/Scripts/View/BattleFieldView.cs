@@ -149,13 +149,16 @@ public class BattleFieldView : MonoBehaviour
 
     private void HandleSlotEnter(SlotView slot)
     {
-        if (selectedCard == null || slot.IsOccupied) return;
-        slot.SetHighlighted(true);
+        // 高亮现在由 CardDragHandler 在拖拽过程中自动处理
+        // 这里只处理非拖拽状态的悬停逻辑（如攻击模式下选择目标时的预览）
+        // if (selectedCard == null || slot.IsOccupied) return;
+        // slot.SetHighlighted(true);
     }
 
     private void HandleSlotExit(SlotView slot)
     {
-        slot.SetHighlighted(false);
+        // 高亮现在由 CardDragHandler 在拖拽过程中自动处理
+        // slot.SetHighlighted(false);
     }
 
     private void HandleCardPlacedToSlot(SlotView slot, CardView card)
