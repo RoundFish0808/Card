@@ -51,6 +51,7 @@ public class CardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, I
     private Vector3 offset;
     private bool isDragging = false;
     private bool wasDragged = false;
+    private HandController cachedHandController;
 
     public bool IsDragging => isDragging;
     public bool WasDragged => wasDragged;
@@ -104,10 +105,12 @@ public class CardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, I
 
         if (canvas == null) return;
 
+        // 缓存 HandController 引用（拖拽过程中父物体可能变化，之后再找就找不到了）
+        cachedHandController = GetComponentInParent<HandController>();
+
         // 暂停手牌布局刷新（防止布局覆盖拖拽位置，导致卡牌乱飞）
-        HandController handController = GetComponentInParent<HandController>();
-        if (handController != null)
-            handController.PauseLayout();
+        if (cachedHandController != null)
+            cachedHandController.PauseLayout();
 
         // 计算鼠标位置与卡牌位置的偏移（保持相对位置不跳变）
         Vector3 mouseWorldPos;
@@ -167,19 +170,33 @@ public class CardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, I
         // 找最近的空槽位吸附
         SlotView nearestSlot = FindNearestEmptySlot();
 
+        bool placed = false;
         if (nearestSlot != null)
         {
             PlaceToSlot(nearestSlot);
+            placed = true;
         }
         else
         {
             ReturnToHand();
         }
 
-        // 恢复手牌布局刷新
-        HandController handController = GetComponentInParent<HandController>();
-        if (handController != null)
-            handController.ResumeLayout(true);
+        // 恢复手牌布局刷新（使用缓存的引用，因为放置后父物体变了就找不到了）
+        if (cachedHandController != null)
+        {
+            if (placed)
+            {
+                // 放置成功：先解除暂停，再从手牌列表移除该卡牌（RemoveCard内部会刷新布局）
+                cachedHandController.ResumeLayout(false);
+                cachedHandController.RemoveCard(gameObject, true);
+            }
+            else
+            {
+                // 回弹：卡牌还在手里，直接刷新布局
+                cachedHandController.ResumeLayout(true);
+            }
+            cachedHandController = null;
+        }
 
         OnDragEnded?.Invoke(this);
 

@@ -148,6 +148,14 @@ public class HandController : MonoBehaviour
     {
         if (cardObj == null) return;
 
+        // 防御：如果已经在列表中，先移除再添加（避免重复）
+        if (cards.Contains(cardObj))
+        {
+            if (refreshLayout)
+                UpdateCardLayout();
+            return;
+        }
+
         cardObj.transform.SetParent(transform, false);
         cards.Add(cardObj);
 
@@ -162,16 +170,24 @@ public class HandController : MonoBehaviour
     {
         if (cardObj == null) return;
 
+        // 防御：如果不在列表中，只在需要时触发清理刷新
+        if (!cards.Contains(cardObj))
+        {
+            if (refreshLayout)
+                UpdateCardLayout();
+            return;
+        }
+
         if (hoveredCard == cardObj)
             hoveredCard = null;
 
         KillCardLayoutTween(cardObj);
-        layoutSequences.Remove(cardObj);//清楚字典动画序列
+        layoutSequences.Remove(cardObj);
 
         UnregisterCardViewEvents(cardObj);
         cardViewCache.Remove(cardObj);
 
-        cards.Remove(cardObj);//清除列表卡牌对象
+        cards.Remove(cardObj);
 
         if (refreshLayout)
             UpdateCardLayout();
@@ -201,9 +217,43 @@ public class HandController : MonoBehaviour
         hoveredCard = null;
     }
 
+    /// <summary>
+    /// 清理已失效或不在手牌中的卡牌（父物体不是自己的，说明已被放置到槽位或其他地方）
+    /// </summary>
+    private void CleanupInvalidCards()
+    {
+        for (int i = cards.Count - 1; i >= 0; i--)
+        {
+            GameObject card = cards[i];
+            if (card == null)
+            {
+                cards.RemoveAt(i);
+                continue;
+            }
+
+            RectTransform rect = card.GetComponent<RectTransform>();
+            if (rect == null || rect.parent != transform)
+            {
+                // 卡牌不在手牌父物体下了（被放置到槽位等），从列表中移除
+                if (hoveredCard == card)
+                    hoveredCard = null;
+
+                KillCardLayoutTween(card);
+                layoutSequences.Remove(card);
+                UnregisterCardViewEvents(card);
+                cardViewCache.Remove(card);
+                cards.RemoveAt(i);
+            }
+        }
+    }
+
     //更新布局
     public void UpdateCardLayout()
     {
+        // 清理已失效或不在手牌中的卡牌（父物体不是自己的，说明已被放置到槽位或其他地方）
+        CleanupInvalidCards();
+
+        Debug.Log($"更新手牌布局,当前手牌数量为{cards.Count}");
         if (isLayoutPaused) return;
 
         int count = cards.Count;
@@ -218,6 +268,9 @@ public class HandController : MonoBehaviour
 
             RectTransform rect = card.GetComponent<RectTransform>();
             if (rect == null) continue;
+
+            // 只处理真正在手牌中的卡牌（父物体是自己的）
+            if (rect.parent != transform) continue;
 
             //计算当前卡牌在样条曲线上的位置比例,一张卡牌在中间
             float t = count == 1
