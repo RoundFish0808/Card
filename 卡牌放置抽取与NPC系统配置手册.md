@@ -3,24 +3,29 @@
 ## 目录
 - [1. 前言](#1-前言)
 - [2. 前置依赖](#2-前置依赖)
-- [3. 功能完成状态概览](#3-功能完成状态概览)
-- [4. 卡牌数据SO配置](#4-卡牌数据so配置)
-- [5. 宣言配置SO](#5-宣言配置so)
-- [6. 预制体准备](#6-预制体准备)
-  - [6.1 卡牌预制体 CardPrefab](#61-卡牌预制体-cardprefab)
-  - [6.2 槽位预制体 SlotPrefab](#62-槽位预制体-slotprefab)
-  - [6.3 宣言气泡预制体 DeclarationBubble](#63-宣言气泡预制体-declarationbubble)
-- [7. 场景搭建](#7-场景搭建)
-  - [7.1 整体层级结构](#71-整体层级结构)
-  - [7.2 玩家手牌 PlayerHand](#72-玩家手牌-playerhand)
-  - [7.3 NPC手牌 NPCHand](#73-npc手牌-npchand)
-  - [7.4 战场 BattleField](#74-战场-battlefield)
-  - [7.5 宣言气泡 DeclarationBubble](#75-宣言气泡-declarationbubble)
-  - [7.6 游戏管理 GameDirector](#76-游戏管理-gamedirector)
-- [8. 脚本字段引用对照表](#8-脚本字段引用对照表)
-- [9. 已完成功能详解](#9-已完成功能详解)
-- [10. 未完成功能规划](#10-未完成功能规划)
-- [11. 运行测试](#11-运行测试)
+- [3. 架构说明](#3-架构说明)
+  - [3.1 MVP架构](#31-mvp架构)
+  - [3.2 HandPresenter 的作用](#32-handpresenter-的作用)
+- [4. 功能完成状态概览](#4-功能完成状态概览)
+- [5. 卡牌数据SO配置](#5-卡牌数据so配置)
+- [6. 宣言配置SO](#6-宣言配置so)
+- [7. 预制体准备](#7-预制体准备)
+  - [7.1 卡牌预制体 CardPrefab](#71-卡牌预制体-cardprefab)
+  - [7.2 槽位预制体 SlotPrefab](#72-槽位预制体-slotprefab)
+  - [7.3 宣言气泡预制体 DeclarationBubble](#73-宣言气泡预制体-declarationbubble)
+- [8. 场景搭建](#8-场景搭建)
+  - [8.1 整体层级结构](#81-整体层级结构)
+  - [8.2 玩家手牌 PlayerHand](#82-玩家手牌-playerhand)
+  - [8.3 NPC手牌 NPCHand](#83-npc手牌-npchand)
+  - [8.4 战场 BattleField](#84-战场-battlefield)
+  - [8.5 宣言气泡 DeclarationBubble](#85-宣言气泡-declarationbubble)
+  - [8.6 游戏管理 GameDirector](#86-游戏管理-gamedirector)
+  - [8.7 测试管理器 GameTestManager](#87-测试管理器-gametestmanager)
+- [9. 脚本字段引用对照表](#9-脚本字段引用对照表)
+- [10. 已完成功能详解](#10-已完成功能详解)
+- [11. 测试工具使用指南](#11-测试工具使用指南)
+- [12. 未完成功能规划](#12-未完成功能规划)
+- [13. 运行测试](#13-运行测试)
 
 ---
 
@@ -31,6 +36,7 @@
 - 预制体准备
 - 场景层级搭建
 - 脚本挂载与引用连线
+- 测试工具使用
 - 测试方法
 
 ---
@@ -43,7 +49,76 @@
 
 ---
 
-## 3. 功能完成状态概览
+## 3. 架构说明
+
+### 3.1 MVP架构
+
+本项目采用 **MVP（Model-View-Presenter）** 架构模式：
+
+| 层级 | 职责 | 对应脚本 |
+|------|------|----------|
+| **Model（数据层）** | 存数据：卡牌数据、配置 | CardDataSO.cs、AIDeclarationConfig.cs |
+| **View（视图层）** | 只管显示：UI排列、动画、视觉效果 | HandController.cs、CardView.cs、SlotView.cs、DeclarationView.cs |
+| **Presenter（表现层）** | 连接视图和逻辑：处理交互事件、协调业务逻辑 | HandPresenter.cs、NPCPresenter.cs |
+
+**设计原则**：
+- View 层只管怎么显示，不管业务逻辑
+- Presenter 层管什么时候做什么，不管怎么显示
+- 改 UI 不影响逻辑，改逻辑不影响 UI
+
+### 3.2 HandPresenter 的作用
+
+HandPresenter 是 **玩家手牌的 Presenter 层**，负责连接手牌视图和业务逻辑。
+
+#### 核心职责
+
+| 功能 | 说明 |
+|------|------|
+| **抽牌管理** | 抽多张/一张牌、抽牌动画、卡牌初始化 |
+| **卡牌生命周期** | 创建卡牌、移除卡牌、事件绑定 |
+| **交互协调** | 监听点击/悬停/拖拽事件、暂停/恢复布局 |
+| **模式切换** | 抽牌/放置后自动切换放置/攻击模式 |
+| **事件广播** | 卡牌选中、放置等事件对外通知 |
+
+#### 与 HandController 的关系
+
+```
+HandPresenter（大脑）
+    ↓ 调用
+HandController（手）→ 只管摆牌、动画、视觉效果
+```
+
+| HandPresenter | HandController |
+|---------------|----------------|
+| 抽牌逻辑 | 弧形排列 |
+| 卡牌数据管理 | 悬停放大效果 |
+| 拖拽事件处理 | 布局动画 |
+| 模式切换 | 暂停/恢复布局 |
+| 放置后移除卡牌 | 卡牌列表维护 |
+
+#### 关键方法
+
+```csharp
+// 抽牌
+DrawCards(List<CardDataSO> cardDataList, bool withAnimation = true)
+DrawCard(CardDataSO cardData, bool withAnimation = true)
+
+// 移除卡牌
+RemoveCard(CardView card)
+
+// 查询
+CardCount → 当前手牌数量
+GetAllCards() → 获取所有卡牌
+GetCardAt(int index) → 获取指定位置卡牌
+
+// 事件
+OnCardSelected → 卡牌被选中时触发
+OnCardPlacedToSlot → 卡牌放置到槽位时触发
+```
+
+---
+
+## 4. 功能完成状态概览
 
 ### ✅ 已完成功能
 
@@ -60,25 +135,29 @@
 | 玩家/NPC卡牌显示区分 | ✅ 完成 | CardView.cs |
 | 宣言气泡显示 | ✅ 完成 | DeclarationView.cs |
 | 宣言配置SO | ✅ 完成 | AIDeclarationConfig.cs |
+| HandPresenter 抽牌管理 | ✅ 完成 | HandPresenter.cs |
+| NPCPresenter 手牌管理 | ✅ 完成 | NPCPresenter.cs |
+| 宣言生成与显示 | ✅ 完成 | AIDeclarer.cs |
+| GameTestManager 测试工具 | ✅ 完成 | GameTestManager.cs |
 
 ### ❌ 未完成功能
 
 | 功能 | 状态 | 预留接口 | 相关脚本 |
 |------|------|----------|----------|
 | 玩家回合流程控制 | ❌ 未完成 | - | - |
-| 抽牌 → 放置/攻击模式切换 | ❌ 未完成 | - | - |
-| 攻击系统状态机 | ❌ 未完成 | IBattleCalculator | AttackSystem.cs |
+| 抽牌 → 放置/攻击模式切换逻辑 | ⚠️ 部分完成 | - | HandPresenter.cs（CheckAndSwitchMode） |
+| 攻击系统状态机 | ⚠️ 部分完成 | IBattleCalculator | AttackSystem.cs |
 | 攻击判定接口实现 | ❌ 未完成 | IBattleCalculator | - |
 | NPC自动布阵AI | ⚠️ 部分完成 | IAIStrategy | IAIStrategy.cs, RandomAIStrategy.cs |
 | NPC自动出牌逻辑 | ❌ 未完成 | - | NPCPresenter.cs |
 
 ---
 
-## 4. 卡牌数据SO配置
+## 5. 卡牌数据SO配置
 
-### 4.1 创建单张卡牌数据
+### 5.1 创建单张卡牌数据
 
-1. 在 Project 窗口中，右键 → **Card → Card Data
+1. 在 Project 窗口中，右键 → **Card → Card Data**
 2. 命名为 `CardData_xxx`（例如 `CardData_Spade_A`）
 3. 在 Inspector 中填写：
 
@@ -90,15 +169,17 @@
 | Rank | 点数 | Ace |
 | Card Sprite | 牌面图片 | 拖拽对应Sprite |
 
-### 4.2 批量创建
+### 5.2 批量创建
 
-重复 4.1 步骤，为每种花色×点数创建所有需要的卡牌SO。
+使用编辑器工具批量生成：
+- 菜单：**Tools → Generate Card Data SOs**
+- 自动生成52张标准扑克牌SO到 `Assets/Data/CardData/` 目录
 
 ---
 
-## 5. 宣言配置SO
+## 6. 宣言配置SO
 
-### 5.1 设计理念
+### 6.1 设计理念
 
 根据架构文档 §3.3，AI 宣言系统的核心设计：
 
@@ -106,7 +187,7 @@
 
 玩家看到 AI 宣言后，需要推理 AI 最强牌的位置，从而决定自己三张牌的出牌顺序。这是一个信息博弈系统。
 
-### 5.2 宣言数据结构 AIDeclaration
+### 6.2 宣言数据结构 AIDeclaration
 
 ```
 AIDeclaration
@@ -117,7 +198,7 @@ AIDeclaration
 
 **PositionHint** 告诉玩家哪张牌最强，**ValueHint** 告诉玩家最强牌是什么点数。难度越高，透露的信息越少。
 
-### 5.3 信息量等级
+### 6.3 信息量等级
 
 | 难度 | InfoLevel | 透露信息 |
 |------|-----------|----------|
@@ -126,7 +207,7 @@ AIDeclaration
 | Hard（困难） | 1 | 模糊宣言（"这一局，我不会输"） |
 | Nightmare（噩梦） | 0 | 最小提示（"……"） |
 
-### 5.4 宣言生成流程
+### 6.4 宣言生成流程
 
 ```
 AI布阵（决定三张牌左→中→右的顺序）
@@ -140,8 +221,11 @@ DeclarationView 显示宣言气泡
 玩家根据宣言推理，选择攻击哪一侧
 ```
 
-### 5.5 创建宣言配置资产
+### 6.5 创建宣言配置资产
 
+**已创建位置**：`Assets/Data/AIDeclarationConfig/AIDeclarationConfig.asset`
+
+手动创建步骤：
 1. 在 Project 窗口中，右键 → **Game → AI Declaration Config**
 2. 命名为 `AIDeclarationConfig`
 3. 在 Inspector 中填写以下配置：
@@ -199,7 +283,7 @@ DeclarationView 显示宣言气泡
 别大意。
 ```
 
-### 5.6 示例效果
+### 6.6 示例效果
 
 假设 AI 手牌为：[红桃5, 黑桃A, 梅花Q]，最强牌是中间的黑桃A
 
@@ -212,13 +296,13 @@ DeclarationView 显示宣言气泡
 
 ---
 
-## 6. 预制体准备
+## 7. 预制体准备
 
-### 6.1 卡牌预制体 CardPrefab
+### 7.1 卡牌预制体 CardPrefab
 
 路径：`Assets/Prefab/CardPrefab/CardPrefab.prefab`
 
-**结构：
+**结构**：
 ```
 CardPrefab (RectTransform + CardView + CardDragHandler + CanvasGroup)
 ├── Image (Image + CanvasRenderer)    ← 牌面图片
@@ -247,10 +331,17 @@ CardPrefab (RectTransform + CardView + CardDragHandler + CanvasGroup)
 | Snap Duration | float | 吸附动画时间，默认 0.25 |
 | Drag Scale | float | 拖拽中缩放倍数，默认 1.2 |
 
-### 6.2 槽位预制体 SlotPrefab
+### 7.2 槽位预制体 SlotPrefab
+
+路径：`Assets/Prefab/SlotPrefab/SlotPrefab.prefab`
+
+**结构**：
+```
+SlotPrefab (RectTransform + SlotView + Image)
+└── CardSlot (RectTransform)  ← 重要：卡牌容器子物体（不受Layout Group影响）
+```
 
 **创建步骤**：
-
 1. Project 窗口右键 → UI → Image，命名为 `SlotPrefab`
 2. 设置 Image 的 Source Image 为槽位底图（或用纯色半透明当占位）
 3. **重要**：在 SlotPrefab 下创建一个子物体，命名为 `CardSlot`（用于放置卡牌的容器）
@@ -273,10 +364,17 @@ CardPrefab (RectTransform + CardView + CardDragHandler + CanvasGroup)
 | Place Ease | Ease | 放置动画缓动 |
 | Interactable | bool | 是否可交互 |
 
-### 6.3 宣言气泡预制体 DeclarationBubble
+### 7.3 宣言气泡预制体 DeclarationBubble
+
+路径：`Assets/Prefab/DeclarationBubble.prefab`
+
+**结构**：
+```
+DeclarationBubble (RectTransform + Image + DeclarationView)
+└── DeclarationText (Text)  ← 宣言文本
+```
 
 **创建步骤**：
-
 1. Project 窗口右键 → UI → Image，命名为 `DeclarationBubble`
 2. 设置 Source Image 为气泡背景图（或纯色圆角矩形）
 3. 在其子下创建一个 UI → Text，命名为 `DeclarationText`
@@ -287,8 +385,8 @@ CardPrefab (RectTransform + CardView + CardDragHandler + CanvasGroup)
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| Bubble Root | GameObject | 气泡根物体（可留空，用自身） |
-| Declaration Text | Text | 宣言文本组件 |
+| Bubble Root | GameObject | 气泡根物体（可留空，自动设为自身） |
+| Declaration Text | Text | 宣言文本组件（可留空，自动查找子物体Text） |
 | Npc Portrait | Image | NPC头像（可选） |
 | Show Duration | float | 弹出动画时长 |
 | Hide Duration | float | 收起动画时长 |
@@ -297,11 +395,13 @@ CardPrefab (RectTransform + CardView + CardDragHandler + CanvasGroup)
 | Use Typewriter | bool | 是否启用打字机效果 |
 | Typewriter Speed | float | 打字机速度 |
 
+> DeclarationView 会在 Awake 时自动查找引用，**不需要手动拖拽**。
+
 ---
 
-## 7. 场景搭建
+## 8. 场景搭建
 
-### 7.1 整体层级结构
+### 8.1 整体层级结构
 
 ```
 Canvas
@@ -318,10 +418,11 @@ Canvas
 ├── PlayerHand           (空物体，挂 HandController，玩家手牌)
 ├── NPCHand              (空物体，挂 HandController，NPC手牌)
 ├── DeclarationBubble     (DeclarationBubble 预制体实例)
-└── GameDirector         (空物体，挂 HandPresenter + NPCPresenter)
+├── GameDirector         (空物体，挂 HandPresenter + NPCPresenter)
+└── GameTestManager      (空物体，挂 GameTestManager，测试用)
 ```
 
-### 7.2 玩家手牌 PlayerHand
+### 8.2 玩家手牌 PlayerHand
 
 1. 在 Canvas 下创建空物体，命名 `PlayerHand`
 2. 添加组件 `HandController`
@@ -341,7 +442,7 @@ Canvas
 | Hover Scale | 1.15 | 悬停放大倍数 |
 | Debug Card Prefab | CardPrefab | 调试用预制体（可选） |
 
-### 7.3 NPC手牌 NPCHand
+### 8.3 NPC手牌 NPCHand
 
 1. 在 Canvas 下创建空物体，命名 `NPCHand`
 2. 添加组件 `HandController`
@@ -355,7 +456,7 @@ Canvas
 
 > NPC手牌默认显示牌背朝上（因为 `CardView.Hide()` 会隐藏正面）
 
-### 7.4 战场 BattleField
+### 8.4 战场 BattleField
 
 1. 在 Canvas 下创建空物体，命名 `BattleField`
 2. 添加组件 `BattleFieldView`
@@ -372,23 +473,31 @@ Canvas
 | NPC Slots | 把 NPCSlots 下的 3 个 Slot_0/1/2拖入数组 |
 | Is Player Turn | ☑ 勾选（默认玩家回合） |
 
-### 7.5 宣言气泡 DeclarationBubble
+### 8.5 宣言气泡 DeclarationBubble
 
 1. 从 Project 把 `DeclarationBubble` 预制体拖到 Canvas 下
 2. 位置：放在 NPC 头像旁边（右上角或中上位置）
 3. DeclarationView 的字段无需额外配置（自动找自身 Image 和 Text）
 
-### 7.6 游戏管理 GameDirector
+### 8.6 游戏管理 GameDirector
 
 1. 在 Canvas 下创建空物体，命名 `GameDirector`
 2. 添加组件 `HandPresenter`
 3. 添加组件 `NPCPresenter`
 
+### 8.7 测试管理器 GameTestManager
+
+1. 在 Canvas 下创建空物体，命名 `GameTestManager`
+2. 添加组件 `GameTestManager`
+3. 在 Inspector 中配置测试数据（testCards 拖入卡牌SO）
+
+> 详细使用说明见 [第11章 测试工具使用指南](#11-测试工具使用指南)
+
 ---
 
-## 8. 脚本字段引用对照表
+## 9. 脚本字段引用对照表
 
-### 8.1 HandController (玩家手牌)
+### 9.1 HandController (玩家手牌)
 
 挂在：`Canvas/PlayerHand`
 
@@ -400,7 +509,7 @@ Canvas
 | Arc Downward | ☑ |
 | Debug Card Prefab | CardPrefab |
 
-### 8.2 HandController (NPC手牌)
+### 9.2 HandController (NPC手牌)
 
 挂在：`Canvas/NPCHand`
 
@@ -412,7 +521,7 @@ Canvas
 | Arc Downward | ☐ |
 | Debug Card Prefab | CardPrefab |
 
-### 8.3 BattleFieldView
+### 9.3 BattleFieldView
 
 挂在：`Canvas/BattleField`
 
@@ -422,7 +531,7 @@ Canvas
 | NPC Slots | 3个NPC槽位(SLot_0/1/2) |
 | Is Player Turn | ☑ |
 
-### 8.4 DeclarationView
+### 9.4 DeclarationView
 
 挂在：`Canvas/DeclarationBubble`
 
@@ -432,7 +541,7 @@ Canvas
 | Declaration Text | 子物体 Text |
 | Default Display Time | 2.5 |
 
-### 8.5 HandPresenter
+### 9.5 HandPresenter
 
 挂在：`Canvas/GameDirector`
 
@@ -441,11 +550,13 @@ Canvas
 | Hand Controller | Canvas/PlayerHand |
 | Card Prefab | CardPrefab.prefab |
 | Battle Field | Canvas/BattleField |
+| Attack System | AttackSystem（可选） |
 | Draw Pile Transform | 牌堆位置的RectTransform（可选，没有则无抽牌动画） |
 | Draw Card Duration | 0.4 |
 | Draw Interval | 0.1 |
+| Is Player Hand | ☑ |
 
-### 8.6 NPCPresenter
+### 9.6 NPCPresenter
 
 挂在：`Canvas/GameDirector`
 
@@ -461,9 +572,9 @@ Canvas
 
 ---
 
-## 9. 已完成功能详解
+## 10. 已完成功能详解
 
-### 9.1 弧形手牌布局 (HandController)
+### 10.1 弧形手牌布局 (HandController)
 
 使用 Unity Splines 包实现卡牌沿弧形曲线均匀分布，配合 DOTween 实现平滑的布局动画。
 
@@ -482,7 +593,7 @@ ResumeLayout(bool refreshImmediate = true)  // 恢复布局刷新
 UpdateCardLayout()  // 手动刷新布局
 ```
 
-### 9.2 卡牌拖拽交互 (CardDragHandler)
+### 10.2 卡牌拖拽交互 (CardDragHandler)
 
 实现卡牌从手牌到槽位的拖拽放置，支持瞬移跟手模式和槽位吸附高亮。
 
@@ -498,7 +609,7 @@ UpdateCardLayout()  // 手动刷新布局
 - 自动高亮：拖拽时实时高亮最近的空槽位
 - 偏移保持：拖拽开始时记录鼠标与卡牌的偏移，放置时保持相对位置
 
-### 9.3 槽位放置功能 (SlotView)
+### 10.3 槽位放置功能 (SlotView)
 
 卡牌放置到槽位时，自动调整锚点、位置、旋转和缩放，使卡牌与槽位完全贴合。
 
@@ -514,7 +625,7 @@ UpdateCardLayout()  // 手动刷新布局
 - 只调整缩放适配槽位大小，位置和旋转归零
 - 放置后卡牌状态变为 CardState.Placed
 
-### 9.4 手牌布局与拖拽冲突修复
+### 10.4 手牌布局与拖拽冲突修复
 
 解决了以下问题：
 - 卡牌放置后位置错乱（因为仍在 HandController.cards 列表中）
@@ -526,11 +637,106 @@ UpdateCardLayout()  // 手动刷新布局
 2. 缓存 HandController 引用：避免放置后找不到
 3. 防御性检查：`AddCard`/`RemoveCard` 增加防重复检查
 
+### 10.5 宣言系统 (DeclarationView + AIDeclarer)
+
+宣言系统实现了基于难度的信息博弈机制。
+
+**核心特性**：
+- 气泡弹出/收起动画（DOTween DOScale）
+- 打字机效果逐字显示
+- 根据AI难度自动控制透露的信息量
+- 自动查找引用，无需手动配置
+
+### 10.6 HandPresenter 抽牌管理
+
+HandPresenter 作为玩家手牌的 Presenter 层，协调抽牌、拖拽、放置等逻辑。
+
+**核心功能**：
+- 抽牌管理（支持动画和无动画两种模式
+- 卡牌生命周期管理（创建/移除）
+- 拖拽事件协调（暂停/恢复布局）
+- 自动模式切换（有空槽位→放置模式，没空槽位→攻击模式）
+
 ---
 
-## 10. 未完成功能规划
+## 11. 测试工具使用指南
 
-### 10.1 玩家回合流程控制
+### 11.1 GameTestManager 介绍
+
+**文件位置**：`Assets/Scripts/Test/GameTestManager.cs`
+
+**场景位置**：`Canvas/GameTestManager`
+
+GameTestManager 是一个可复用的测试管理器，提供以下功能：
+- 内置多种测试功能，一键触发
+- 实时日志输出
+- 支持自定义扩展测试
+- 按 F3 键显示/隐藏面板
+
+### 11.2 面板操作
+
+| 操作 | 说明 |
+|------|------|
+| 显示/隐藏 | 按 **F3** 键 |
+| 执行测试 | 点击对应按钮 |
+| 查看日志 | 面板底部实时显示 |
+
+### 11.3 内置测试功能
+
+| 分类 | 测试项 | 说明 |
+|------|--------|------|
+| **NPC系统** | Initialize Hand | 初始化NPC手牌（需要配置3张测试卡牌） |
+| | Generate Declaration | 生成并显示宣言 |
+| | Show Declaration | 根据难度显示测试宣言 |
+| | Full Flow | 完整流程（初始化+宣言） |
+| **玩家系统** | Draw 5 Cards | 给玩家发5张牌 |
+| | Clear Hand | 清空玩家手牌 |
+| **战斗系统** | Enter Attack Mode | 进入攻击模式 |
+| | Simulate Attack | 模拟攻击测试 |
+| **工具** | Refresh Layout | 刷新所有手牌布局 |
+| | Clear Console | 清空控制台日志 |
+| | List Scene Objects | 列出场景根物体 |
+
+### 11.4 配置测试数据
+
+在 Inspector 中设置：
+
+| 字段 | 说明 |
+|------|------|
+| testCards | 拖入3-5张卡牌SO作为测试数据 |
+| testDifficulty | 选择AI难度（用于宣言测试） |
+| showTestPanel | 是否显示测试面板 |
+| toggleKey | 切换面板显示的按键（默认F3） |
+
+### 11.5 扩展自定义测试
+
+#### 方式一：调用 API 注册
+
+在其他脚本中调用：
+
+```csharp
+GameTestManager.Instance?.RegisterTest("我的测试名", () => {
+    // 你的测试代码
+    GameTestManager.Instance?.LogTest("测试日志");
+});
+```
+
+#### 方式二：直接修改脚本
+
+在 `GameTestManager.cs` 的 `RegisterTestFunctions()` 方法中添加：
+
+```csharp
+testFunctions["分类: 测试名称"] = () => {
+    // 你的测试代码
+    Log("测试日志");
+};
+```
+
+---
+
+## 12. 未完成功能规划
+
+### 12.1 玩家回合流程控制
 
 **目标**：实现完整的玩家回合流程：
 1. 玩家回合开始
@@ -545,7 +751,7 @@ UpdateCardLayout()  // 手动刷新布局
 - UI 提示系统：显示当前操作提示
 - 模式切换逻辑：在放置/攻击模式之间切换
 
-### 10.2 攻击系统
+### 12.2 攻击系统
 
 **目标**：实现卡牌攻击功能：
 1. 玩家选择自己的一张已放置卡牌作为主攻牌
@@ -562,7 +768,7 @@ UpdateCardLayout()  // 手动刷新布局
 - 攻击动画
 - 攻击结果应用（胜负判定）
 
-### 10.3 NPC自动出牌
+### 12.3 NPC自动出牌
 
 **目标**：NPC 能够自动布阵和出牌
 
@@ -577,9 +783,18 @@ UpdateCardLayout()  // 手动刷新布局
 
 ---
 
-## 11. 运行测试
+## 13. 运行测试
 
-### 11.1 宣言系统验证（优先测试）
+### 13.1 快速验证步骤
+
+1. 打开场景 SampleScene.unity
+2. 确保 GameTestManager 已添加到场景
+3. 在 GameTestManager 的 Inspector 中配置 testCards（拖入3-5张卡牌SO
+4. 点击 Play 按钮运行
+5. 按 **F3** 打开测试面板
+6. 点击测试按钮验证各项功能
+
+### 13.2 宣言系统验证
 
 宣言系统的核心是**信息博弈**，按以下流程验证：
 
@@ -604,7 +819,7 @@ UpdateCardLayout()  // 手动刷新布局
 - Hard：应显示模糊宣言
 - Nightmare：应只显示"……"
 
-### 11.2 拖拽放置测试
+### 13.3 拖拽放置测试
 
 **测试要点**：
 1. 运行场景，观察玩家手牌是否以弧形展开在下方
@@ -615,7 +830,7 @@ UpdateCardLayout()  // 手动刷新布局
 6. 放置后卡牌是否与槽位位置/旋转/大小一致
 7. 放置后剩余手牌是否正确重新排列
 
-### 11.3 完整流程测试步骤
+### 13.4 完整流程测试步骤
 
 1. 运行场景
 2. 观察玩家手牌是否以弧形展开在下方（HandController 弧形排列）
@@ -625,7 +840,7 @@ UpdateCardLayout()  // 手动刷新布局
 6. **观察宣言气泡**：根据当前 AI 难度，验证显示内容是否正确
 7. **切换难度测试**：在 Inspector 中修改 `Difficulty`，重新运行验证信息量变化
 
-### 11.4 常见问题
+### 13.5 常见问题
 
 | 问题 | 可能原因 | 解决方法 |
 |------|----------|----------|
@@ -636,6 +851,7 @@ UpdateCardLayout()  // 手动刷新布局
 | 放置后卡牌位置错乱 | 卡牌仍在HandController.cards列表 | 确保调用了RemoveCard()或CleanupInvalidCards()生效 |
 | 槽位高亮不显示 | CardDragHandler未正确检测槽位 | 检查snapDistance是否足够大 |
 | 卡牌放置不贴合槽位 | SlotPrefab缺少CardSlot子物体 | 确保创建了CardSlot子物体作为卡牌容器 |
+| 测试面板不显示 | GameTestManager未添加到场景 | 手动添加GameTestManager组件 |
 
 ---
 
@@ -644,3 +860,4 @@ UpdateCardLayout()  // 手动刷新布局
 | 日期 | 更新内容 |
 |------|----------|
 | 2026-06-29 | 初始版本，区分已完成/未完成功能 |
+| 2026-06-30 | 添加架构说明（MVP、HandPresenter作用）、GameTestManager测试工具、更新完成状态 |
