@@ -80,8 +80,10 @@ public class GameTestManager : MonoBehaviour
         GUI.skin.label.alignment = TextAnchor.MiddleLeft;
         GUI.skin.label.fontSize = 12;
 
+        DrawNpcCardVisibilityToggle();
+
         // 测试功能列表
-        scrollPosition = GUILayout.BeginScrollView(scrollPosition, GUILayout.Height(panelHeight - 180));
+        scrollPosition = GUILayout.BeginScrollView(scrollPosition, GUILayout.Height(panelHeight - 210));
 
         foreach (var test in testFunctions)
         {
@@ -125,6 +127,35 @@ public class GameTestManager : MonoBehaviour
     private void Log(string message)
     {
         Log(message, Color.white);
+    }
+
+    private void DrawNpcCardVisibilityToggle()
+    {
+        var cardManager = FindObjectOfType<CardManager>();
+        var npc = FindObjectOfType<NPCPresenter>();
+
+        bool currentValue = cardManager != null
+            ? cardManager.debugShowNpcCards
+            : npc != null && npc.debugShowFront;
+
+        bool nextValue = GUILayout.Toggle(currentValue, "Show NPC Cards", GUILayout.Height(24));
+        if (nextValue == currentValue) return;
+
+        if (cardManager != null)
+        {
+            cardManager.SetNPCDebugCardsVisible(nextValue);
+        }
+        else if (npc != null)
+        {
+            npc.SetDebugShowFront(nextValue);
+        }
+        else
+        {
+            Log("No NPC cards found to toggle", Color.yellow);
+            return;
+        }
+
+        Log("NPC cards visible: " + nextValue, nextValue ? Color.green : Color.yellow);
     }
 
     /// <summary>

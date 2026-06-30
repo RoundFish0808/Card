@@ -16,11 +16,18 @@ public class CardManager : MonoBehaviour
     [Tooltip("使用样条曲线思路实现的弧形手牌控制器")]
     public HandController handController;
 
+    [Header("NPC 手牌控制")]
+    public NPCPresenter npcPresenter;
+    public bool debugShowNpcCards = true;
+    public bool autoDeclareOnStart = true;
+    public float openingDeclarationDisplayTime = 5f;
+
     [Header("是否使用弧形手牌")]
     public bool useArcHand = true;
 
     private List<CardDataSO> deck = new List<CardDataSO>();
     private List<CardDataSO> playerHand = new List<CardDataSO>();
+    private List<CardDataSO> npcHand = new List<CardDataSO>();
     private List<GameObject> playerHandObjects = new List<GameObject>();
 
     private void Start()
@@ -29,7 +36,10 @@ public class CardManager : MonoBehaviour
         ShuffleDeck();
 
         DrawPlayerCards(5);
+        DrawNPCCards(3);
         ShowPlayerCards();
+        ShowNPCCards();
+        ShowOpeningNPCDeclaration();
     }
 
     private void CreateDeck()
@@ -87,6 +97,87 @@ public class CardManager : MonoBehaviour
                 Debug.Log("玩家抽到：" + card.cardName);
             }
         }
+    }
+
+    private void DrawNPCCards(int count)
+    {
+        npcHand.Clear();
+
+        for (int i = 0; i < count; i++)
+        {
+            CardDataSO card = DrawCard();
+
+            if (card != null)
+            {
+                npcHand.Add(card);
+            }
+        }
+
+        Debug.Log("NPC 初始手牌：" + FormatCardList(npcHand));
+    }
+
+    private void ShowNPCCards()
+    {
+        if (npcPresenter == null)
+        {
+            npcPresenter = FindObjectOfType<NPCPresenter>();
+        }
+
+        if (npcPresenter == null)
+        {
+            Debug.LogWarning("CardManager 没有找到 NPCPresenter，无法显示 NPC 初始手牌");
+            return;
+        }
+
+        npcPresenter.debugShowFront = debugShowNpcCards;
+        npcPresenter.InitializeHand(npcHand);
+        npcPresenter.SetDebugShowFront(debugShowNpcCards);
+        Debug.Log($"NPC 手牌显示完成，数量：{npcHand.Count}，Debug正面显示：{debugShowNpcCards}");
+    }
+
+    private void ShowOpeningNPCDeclaration()
+    {
+        if (!autoDeclareOnStart) return;
+
+        if (npcPresenter == null)
+        {
+            Debug.LogWarning("CardManager 没有找到 NPCPresenter，无法生成开局宣言");
+            return;
+        }
+
+        if (npcHand.Count < 3)
+        {
+            Debug.LogWarning("NPC 初始手牌不足 3 张，无法生成开局宣言");
+            return;
+        }
+
+        npcPresenter.GenerateAndShowDeclaration(openingDeclarationDisplayTime);
+        Debug.Log("NPC 已根据开局手牌生成宣言并显示");
+    }
+
+    public void SetNPCDebugCardsVisible(bool visible)
+    {
+        debugShowNpcCards = visible;
+
+        if (npcPresenter == null)
+            npcPresenter = FindObjectOfType<NPCPresenter>();
+
+        if (npcPresenter != null)
+            npcPresenter.SetDebugShowFront(visible);
+    }
+
+    private string FormatCardList(List<CardDataSO> cards)
+    {
+        if (cards == null || cards.Count == 0)
+            return "无";
+
+        List<string> names = new List<string>();
+        foreach (var card in cards)
+        {
+            names.Add(card != null ? card.cardName : "空牌");
+        }
+
+        return string.Join("、", names);
     }
 
     private void ShowPlayerCards()

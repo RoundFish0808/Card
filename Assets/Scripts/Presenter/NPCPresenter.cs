@@ -109,7 +109,7 @@ public class NPCPresenter : MonoBehaviour
     /// AI 布阵 + 生成宣言 + 显示气泡
     /// 完整流程：策略布阵 → 分析最强牌 → 根据难度生成宣言 → DeclarationView 显示
     /// </summary>
-    public void GenerateAndShowDeclaration()
+    public void GenerateAndShowDeclaration(float displayTime = -1f)
     {
         if (npcHandData.Count < 3)
         {
@@ -131,7 +131,7 @@ public class NPCPresenter : MonoBehaviour
         {
             string displayText = declaration.ToString();
             if (!string.IsNullOrEmpty(displayText))
-                declarationView.ShowDeclaration(displayText);
+                declarationView.ShowDeclaration(displayText, displayTime);
         }
 
         Debug.Log($"[NPC] 宣言生成 (难度={difficulty}, InfoLevel={infoLevel}): {declaration.PositionHint} | {declaration.ValueHint}");
@@ -223,6 +223,16 @@ public class NPCPresenter : MonoBehaviour
     {
         foreach (var card in npcHandViews)
             card.Hide();
+    }
+
+    public void SetDebugShowFront(bool showFront)
+    {
+        debugShowFront = showFront;
+
+        if (showFront)
+            RevealAllCards();
+        else
+            HideAllCards();
     }
 
     public int HandCardCount => npcHandData.Count;
