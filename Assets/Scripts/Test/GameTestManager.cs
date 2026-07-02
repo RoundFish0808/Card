@@ -80,10 +80,8 @@ public class GameTestManager : MonoBehaviour
         GUI.skin.label.alignment = TextAnchor.MiddleLeft;
         GUI.skin.label.fontSize = 12;
 
-        DrawNpcCardVisibilityToggle();
-
         // 测试功能列表
-        scrollPosition = GUILayout.BeginScrollView(scrollPosition, GUILayout.Height(panelHeight - 210));
+        scrollPosition = GUILayout.BeginScrollView(scrollPosition, GUILayout.Height(panelHeight - 180));
 
         foreach (var test in testFunctions)
         {
@@ -129,35 +127,6 @@ public class GameTestManager : MonoBehaviour
         Log(message, Color.white);
     }
 
-    private void DrawNpcCardVisibilityToggle()
-    {
-        var cardManager = FindObjectOfType<CardManager>();
-        var npc = FindObjectOfType<NPCPresenter>();
-
-        bool currentValue = cardManager != null
-            ? cardManager.debugShowNpcCards
-            : npc != null && npc.debugShowFront;
-
-        bool nextValue = GUILayout.Toggle(currentValue, "Show NPC Cards", GUILayout.Height(24));
-        if (nextValue == currentValue) return;
-
-        if (cardManager != null)
-        {
-            cardManager.SetNPCDebugCardsVisible(nextValue);
-        }
-        else if (npc != null)
-        {
-            npc.SetDebugShowFront(nextValue);
-        }
-        else
-        {
-            Log("No NPC cards found to toggle", Color.yellow);
-            return;
-        }
-
-        Log("NPC cards visible: " + nextValue, nextValue ? Color.green : Color.yellow);
-    }
-
     /// <summary>
     /// 注册测试功能
     /// </summary>
@@ -168,6 +137,9 @@ public class GameTestManager : MonoBehaviour
         testFunctions["NPC: Generate Declaration"] = Test_NPC_GenerateDeclaration;
         testFunctions["NPC: Show Declaration"] = Test_NPC_ShowDeclaration;
         testFunctions["NPC: Full Flow (Init + Declare)"] = Test_NPC_FullFlow;
+        testFunctions["NPC: Show Cards (Debug)"] = Test_NPC_ShowCardsDebug;
+        testFunctions["NPC: Hide Cards (Debug)"] = Test_NPC_HideCardsDebug;
+        testFunctions["NPC: Toggle Cards (Debug)"] = Test_NPC_ToggleCardsDebug;
 
         // ===== 玩家系统测试 =====
         testFunctions["Player: Draw 5 Cards"] = Test_Player_DrawCards;
@@ -242,6 +214,46 @@ public class GameTestManager : MonoBehaviour
     {
         Test_NPC_InitializeHand();
         Test_NPC_GenerateDeclaration();
+    }
+
+    private void Test_NPC_ShowCardsDebug()
+    {
+        // 仅用于调试：显示 NPC 所有手牌/槽位牌正面，不改变实际战斗结算。
+        SetNpcCardsDebugVisible(true);
+    }
+
+    private void Test_NPC_HideCardsDebug()
+    {
+        // 回到正式玩法显示：NPC 未被攻击的牌保持盖住。
+        SetNpcCardsDebugVisible(false);
+    }
+
+    private void Test_NPC_ToggleCardsDebug()
+    {
+        var cardManager = FindObjectOfType<CardManager>();
+        var npc = FindObjectOfType<NPCPresenter>();
+        if (cardManager == null && npc == null) { Log("No NPC cards found to toggle", Color.red); return; }
+
+        bool currentState = cardManager != null ? cardManager.debugShowNpcCards : npc.DebugShowFront;
+        SetNpcCardsDebugVisible(!currentState);
+    }
+
+    private void SetNpcCardsDebugVisible(bool visible)
+    {
+        var cardManager = FindObjectOfType<CardManager>();
+        if (cardManager != null)
+        {
+            // 通过 CardManager 设置，后续 NPC 补牌/新小局也会沿用当前调试显示状态。
+            cardManager.SetNPCDebugCardsVisible(visible);
+            Log("NPC cards debug view: " + (visible ? "SHOW" : "HIDE"), Color.cyan);
+            return;
+        }
+
+        var npc = FindObjectOfType<NPCPresenter>();
+        if (npc == null) { Log("No NPCPresenter found!", Color.red); return; }
+
+        npc.SetDebugShowFront(visible);
+        Log("NPC cards debug view: " + (visible ? "SHOW" : "HIDE"), Color.cyan);
     }
 
     #endregion

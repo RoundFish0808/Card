@@ -198,10 +198,10 @@ public class CardView : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
 
         // 放置在槽位中时：
         // - 玩家的牌：显示正面（玩家自己能看到）
-        // - NPC的牌：显示背面（玩家看不到）
+        // - NPC的牌：根据 isRevealed 显示，方便调试面板切换明牌/暗牌
         if (currentState == CardState.Placed)
         {
-            showFront = isPlayerCard;
+            showFront = isPlayerCard || isRevealed;
         }
 
         if (cardBack != null)

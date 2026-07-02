@@ -39,6 +39,7 @@ public class NPCPresenter : MonoBehaviour
     private IAIStrategy aiStrategy;
     private readonly List<CardDataSO> npcHandData = new List<CardDataSO>();
     private readonly List<CardView> npcHandViews = new List<CardView>();
+    private readonly List<CardView> npcSlotViews = new List<CardView>();
 
     /// <summary>
     /// AI布阵后的手牌顺序（索引0=左边，1=中间，2=右边）
@@ -94,6 +95,7 @@ public class NPCPresenter : MonoBehaviour
             cardView = cardObj.AddComponent<CardView>();
 
         cardView.Init(data);
+        cardView.isPlayerCard = false;
 
         if (debugShowFront)
             cardView.Reveal();
@@ -118,7 +120,7 @@ public class NPCPresenter : MonoBehaviour
         }
 
         // Step 1: AI 布阵（使用策略决定左→中→右的顺序）
-        arrangedCards = aiStrategy.Arrange(new List<CardDataSO>(npcHandData));
+        EnsureArrangedCards();
 
         // Step 2: 根据难度获取信息量等级
         int infoLevel = AIDeclarer.GetInfoLevelByDifficulty(difficulty);
@@ -135,6 +137,43 @@ public class NPCPresenter : MonoBehaviour
         }
 
         Debug.Log($"[NPC] 宣言生成 (难度={difficulty}, InfoLevel={infoLevel}): {declaration.PositionHint} | {declaration.ValueHint}");
+    }
+
+    public void PlaceArrangedCardsToNPCSlots(bool withAnimation = true)
+    {
+        if (battleField == null || battleField.npcSlots == null || battleField.npcSlots.Length < 3)
+        {
+            Debug.LogWarning("NPCPresenter: BattleFieldView 或 NPC 槽位未正确配置，无法放置 NPC 卡牌");
+            return;
+        }
+
+        EnsureArrangedCards();
+        if (arrangedCards == null || arrangedCards.Count < 3)
+        {
+            Debug.LogWarning("NPCPresenter: 还没有有效布阵结果，无法放置 NPC 卡牌");
+            return;
+        }
+
+        ClearNPCSlots();
+
+        var cardsToPlace = new List<CardDataSO>(arrangedCards);
+        for (int slotIndex = 0; slotIndex < 3; slotIndex++)
+        {
+            PlaceCardDataToNPCSlot(cardsToPlace[slotIndex], slotIndex, withAnimation);
+        }
+
+        arrangedCards.Clear();
+
+        if (npcHandController != null)
+            npcHandController.RefreshLayout();
+    }
+
+    private void EnsureArrangedCards()
+    {
+        if (arrangedCards != null && arrangedCards.Count >= 3) return;
+        if (npcHandData.Count < 3) return;
+
+        arrangedCards = aiStrategy.Arrange(new List<CardDataSO>(npcHandData));
     }
 
     /// <summary>
@@ -178,13 +217,64 @@ public class NPCPresenter : MonoBehaviour
         if (npcHandController != null)
             npcHandController.RemoveCard(card.gameObject);
 
-        // 翻牌并放置到槽位
-        card.Reveal();
+        if (debugShowFront)
+            card.Reveal();
+        else
+            card.Hide();
+
         battleField?.PlaceCardToNPCSlot(slotIndex, card, true);
+        if (!npcSlotViews.Contains(card))
+            npcSlotViews.Add(card);
 
         // 刷新 NPC 手牌弧形布局
         if (npcHandController != null)
             npcHandController.RefreshLayout();
+    }
+
+    private void PlaceCardDataToNPCSlot(CardDataSO cardData, int slotIndex, bool withAnimation)
+    {
+        int viewIndex = npcHandData.IndexOf(cardData);
+        if (viewIndex < 0 || viewIndex >= npcHandViews.Count)
+        {
+            Debug.LogWarning($"NPCPresenter: 找不到要放入槽位 {slotIndex} 的 NPC 卡牌视图");
+            return;
+        }
+
+        CardView card = npcHandViews[viewIndex];
+        npcHandViews.RemoveAt(viewIndex);
+        npcHandData.RemoveAt(viewIndex);
+
+        if (npcHandController != null)
+            npcHandController.RemoveCard(card.gameObject, false);
+
+        if (debugShowFront)
+            card.Reveal();
+        else
+            card.Hide();
+
+        battleField.PlaceCardToNPCSlot(slotIndex, card, withAnimation);
+        npcSlotViews.Add(card);
+    }
+
+    private void ClearNPCSlots()
+    {
+        foreach (var card in npcSlotViews)
+        {
+            if (card != null)
+                Destroy(card.gameObject);
+        }
+        npcSlotViews.Clear();
+
+        if (battleField == null || battleField.npcSlots == null) return;
+
+        foreach (var slot in battleField.npcSlots)
+        {
+            if (slot == null) continue;
+
+            CardView removed = slot.RemoveCard();
+            if (removed != null)
+                Destroy(removed.gameObject);
+        }
     }
 
     /// <summary>
@@ -213,7 +303,21 @@ public class NPCPresenter : MonoBehaviour
     public void RevealAllCards()
     {
         foreach (var card in npcHandViews)
-            card.Reveal();
+            if (card != null)
+                card.Reveal();
+        foreach (var card in npcSlotViews)
+            if (card != null)
+                card.Reveal();
+
+        // 保险处理：直接扫描 NPCSlots，避免槽位里的牌没有被 npcSlotViews 记录时调试按钮失效。
+        if (battleField != null && battleField.npcSlots != null)
+        {
+            foreach (var slot in battleField.npcSlots)
+            {
+                if (slot != null && slot.CurrentCard != null)
+                    slot.CurrentCard.Reveal();
+            }
+        }
     }
 
     /// <summary>
@@ -222,7 +326,21 @@ public class NPCPresenter : MonoBehaviour
     public void HideAllCards()
     {
         foreach (var card in npcHandViews)
-            card.Hide();
+            if (card != null)
+                card.Hide();
+        foreach (var card in npcSlotViews)
+            if (card != null)
+                card.Hide();
+
+        // 调试关闭时，所有还在 NPC 槽位里的牌恢复盖牌显示；攻击时会单独翻开被攻击的那张。
+        if (battleField != null && battleField.npcSlots != null)
+        {
+            foreach (var slot in battleField.npcSlots)
+            {
+                if (slot != null && slot.CurrentCard != null)
+                    slot.CurrentCard.Hide();
+            }
+        }
     }
 
     public void SetDebugShowFront(bool showFront)
@@ -234,6 +352,8 @@ public class NPCPresenter : MonoBehaviour
         else
             HideAllCards();
     }
+
+    public bool DebugShowFront => debugShowFront;
 
     public int HandCardCount => npcHandData.Count;
     public int ArrangedCardCount => arrangedCards.Count;

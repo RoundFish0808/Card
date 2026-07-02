@@ -35,6 +35,7 @@ public class SlotView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     public bool canBeAttackTarget = false;
 
     public bool IsOccupied => CurrentCard != null;
+    public bool IsResolvedThisRound { get; private set; }
     public CardView CurrentCard { get; private set; }
 
     public event Action<SlotView> OnSlotClicked;
@@ -61,11 +62,17 @@ public class SlotView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     {
         if (card == null) return;
 
+        // 如果槽位原本已有牌，先解除旧牌点击监听，避免重复触发。
+        if (CurrentCard != null)
+            CurrentCard.OnClicked -= HandleCurrentCardClicked;
 
         Debug.Log($"PlaceCard {card.name} to Slot {slotIndex}");
 
 
         CurrentCard = card;
+        IsResolvedThisRound = false;
+        CurrentCard.OnClicked += HandleCurrentCardClicked;
+        SetCardBlocksRaycasts(CurrentCard, true);
         RectTransform cardRect = card.GetComponent<RectTransform>();
         if (rectTransform == null) rectTransform = GetComponent<RectTransform>();
 
@@ -155,6 +162,8 @@ public class SlotView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
         CardView card = CurrentCard;
         if (card != null)
         {
+            card.OnClicked -= HandleCurrentCardClicked;
+            SetCardBlocksRaycasts(card, true);
             card.SetState(CardState.InHand);
             RectTransform cardRect = card.GetComponent<RectTransform>();
             // 恢复中心锚点 + 0 偏移 + 0 旋转
@@ -166,8 +175,37 @@ public class SlotView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
             cardRect.localScale = Vector3.one;
         }
         CurrentCard = null;
+        IsResolvedThisRound = false;
         SetNormalState();
         return card;
+    }
+
+    public void SetResolvedThisRound(bool resolved)
+    {
+        IsResolvedThisRound = resolved;
+        if (resolved)
+            SetAttackTargetHighlight(false);
+    }
+
+    private void SetCardBlocksRaycasts(CardView card, bool blocksRaycasts)
+    {
+        if (card == null) return;
+
+        // 卡牌进入槽位后必须保留点击射线。
+        // SlotView 会监听 CardView.OnClicked，并把“点击牌”转成“点击槽位”，用于攻击选择流程。
+        CanvasGroup canvasGroup = card.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+            canvasGroup = card.gameObject.AddComponent<CanvasGroup>();
+
+        canvasGroup.blocksRaycasts = blocksRaycasts;
+    }
+
+    private void HandleCurrentCardClicked(CardView card)
+    {
+        // 卡牌放到槽位后会挡住槽位本身的射线。
+        // 点击槽位中的卡牌时，等价于点击这个槽位，用于攻击选择流程。
+        if (!interactable) return;
+        OnSlotClicked?.Invoke(this);
     }
 
     /// <summary>

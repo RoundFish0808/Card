@@ -23,6 +23,10 @@ public struct BattleResultData
     public int baseScore;             // 基本分
     public int diffScore;             // 差值分
     public int totalScore;            // 总分
+    public int playerScore;           // 本回合玩家得分
+    public int npcScore;              // 本回合 NPC 得分
+    public int playerBattleValue;      // 玩家卡牌参与比较的点数
+    public int npcBattleValue;         // NPC 卡牌参与比较的点数
     public SuitEffectType triggeredEffect; // 触发的花色特效
 
     public static readonly BattleResultData Empty = new BattleResultData
@@ -31,6 +35,10 @@ public struct BattleResultData
         baseScore = 0,
         diffScore = 0,
         totalScore = 0,
+        playerScore = 0,
+        npcScore = 0,
+        playerBattleValue = 0,
+        npcBattleValue = 0,
         triggeredEffect = SuitEffectType.None
     };
 }

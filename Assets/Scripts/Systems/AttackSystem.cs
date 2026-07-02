@@ -40,7 +40,7 @@ public class AttackSystem : MonoBehaviour
     public CardView SelectedAttacker => selectedAttacker;
     public bool IsInAttackMode => currentPhase != AttackPhase.Idle;
 
-    public event Action<CardView, CardView> OnAttackResolved;    // 攻击完成回调（主攻， 主攻牌， 目标牌）
+    public event Action<CardView, CardView, SlotView, SlotView, BattleResultData> OnAttackResolved;
     public event Action<AttackPhase> OnPhaseChanged;
 
     private void Awake()
@@ -77,13 +77,29 @@ public class AttackSystem : MonoBehaviour
     /// </summary>
     public void OnPlayerSlotClicked(SlotView slot)
     {
-        if (currentPhase != AttackPhase.SelectingAttacker) return;
-        if (!slot.IsOccupied) return;
+        if (currentPhase != AttackPhase.SelectingAttacker)
+        {
+            Debug.Log($"[AttackSystem] 当前不是选择己方攻击牌阶段，忽略玩家槽位点击。当前阶段：{currentPhase}");
+            return;
+        }
+
+        if (!slot.IsOccupied)
+        {
+            Debug.Log($"[AttackSystem] 玩家槽位 {slot.slotIndex} 没有牌，不能作为攻击牌。");
+            return;
+        }
+
+        if (slot.IsResolvedThisRound)
+        {
+            Debug.Log($"[AttackSystem] 玩家槽位 {slot.slotIndex} 本小局已经结算过，不能重复攻击。");
+            return;
+        }
 
         // 选中主攻牌
         selectedAttacker = slot.CurrentCard;
         selectedAttackerSlot = slot;
         selectedAttacker.SetSelected(true);
+        Debug.Log($"[AttackSystem] 已选择玩家攻击牌：槽位 {slot.slotIndex}，{selectedAttacker.CardData.cardName}");
 
         SetPhase(AttackPhase.SelectingTarget);
         ShowHint(selectTargetHint);
@@ -97,10 +113,26 @@ public class AttackSystem : MonoBehaviour
     /// </summary>
     public void OnEnemySlotClicked(SlotView slot)
     {
-        if (currentPhase != AttackPhase.SelectingTarget) return;
-        if (!slot.IsOccupied) return;
+        if (currentPhase != AttackPhase.SelectingTarget)
+        {
+            Debug.Log($"[AttackSystem] 当前不是选择NPC目标阶段，忽略NPC槽位点击。当前阶段：{currentPhase}");
+            return;
+        }
+
+        if (!slot.IsOccupied)
+        {
+            Debug.Log($"[AttackSystem] NPC槽位 {slot.slotIndex} 没有牌，不能被攻击。");
+            return;
+        }
+
+        if (slot.IsResolvedThisRound)
+        {
+            Debug.Log($"[AttackSystem] NPC槽位 {slot.slotIndex} 本小局已经被攻击过，不能重复选择。");
+            return;
+        }
 
         CardView targetCard = slot.CurrentCard;
+        Debug.Log($"[AttackSystem] 已选择NPC目标牌：槽位 {slot.slotIndex}");
 
         // 触发攻击
         ResolveAttack(selectedAttacker, targetCard, slot);
@@ -111,23 +143,32 @@ public class AttackSystem : MonoBehaviour
     /// </summary>
     private void ResolveAttack(CardView attacker, CardView target, SlotView targetSlot)
     {
-        // 预留攻击计算（调用预留接口
+        if (attacker == null || target == null || selectedAttackerSlot == null || targetSlot == null)
+            return;
 
+        // 攻击发生时，双方参与结算的牌翻开。
+        attacker.Reveal();
+        target.Reveal();
+
+        BattleResultData result = BattleResultData.Empty;
         if (battleCalculator != null)
         {
-            BattleResultData result = battleCalculator.Calculate(attacker.CardData, target.CardData);
-            Debug.Log($"[AttackSystem] 攻击结算: {attacker.CardData.cardName} vs {target.CardData.cardName} → {result.result}, 得分: {result.totalScore}");
+            result = battleCalculator.Calculate(attacker.CardData, target.CardData);
+            Debug.Log($"[AttackSystem] 攻击结算: {attacker.CardData.cardName} vs {target.CardData.cardName} → {result.result}, 玩家+{result.playerScore}, NPC+{result.npcScore}");
         }
         else
         {
             Debug.LogWarning("[AttackSystem] battleCalculator 未设置，跳过结算（预留接口");
         }
 
-        OnAttackResolved?.Invoke(selectedAttacker, target);
+        CardView resolvedAttacker = selectedAttacker;
+        SlotView resolvedAttackerSlot = selectedAttackerSlot;
 
         // 清理选择状态
         ClearSelection();
         ExitAttackMode();
+
+        OnAttackResolved?.Invoke(resolvedAttacker, target, resolvedAttackerSlot, targetSlot, result);
     }
 
     private void SetPhase(AttackPhase phase)
@@ -152,7 +193,7 @@ public class AttackSystem : MonoBehaviour
 
         foreach (var slot in battleField.playerSlots)
         {
-            if (slot.IsOccupied)
+            if (slot.IsOccupied && !slot.IsResolvedThisRound)
             {
                 if (highlight)
                     slot.SetAttackTargetHighlight(highlight);
@@ -168,7 +209,7 @@ public class AttackSystem : MonoBehaviour
 
         foreach (var slot in battleField.npcSlots)
         {
-            if (slot.IsOccupied)
+            if (slot.IsOccupied && !slot.IsResolvedThisRound)
             {
                 slot.SetAttackTargetHighlight(highlight);
             }

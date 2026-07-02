@@ -201,14 +201,16 @@ public class HandController : MonoBehaviour
     //清除所有卡牌,并销毁所有卡牌对象
     public void ClearCards()
     {
-        foreach (var kvp in layoutSequences)
+        // Kill 动画时 OnKill 回调会写 layoutSequences，因此必须遍历快照，不能直接遍历字典本体。
+        foreach (var sequence in new List<Sequence>(layoutSequences.Values))
         {
-            if (kvp.Value != null)
-                kvp.Value.Kill(false);
+            if (sequence != null)
+                sequence.Kill(false);
         }
         layoutSequences.Clear();
 
-        foreach (var card in cards)
+        // Destroy 也可能触发组件清理逻辑，遍历快照更稳。
+        foreach (var card in new List<GameObject>(cards))
         {
             if (card != null)
                 Destroy(card);

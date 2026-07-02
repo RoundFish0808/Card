@@ -164,6 +164,27 @@ public class BattleFieldView : MonoBehaviour
     private void HandleCardPlacedToSlot(SlotView slot, CardView card)
     {
         OnPlayerPlacedCard?.Invoke(slot.slotIndex, card);
+
+        // 玩家槽位一旦有牌，就立即进入攻击模式。
+        // 这里放在 BattleFieldView 内部处理，避免依赖 HandPresenter 的创建/订阅流程，导致牌已放下但点击没有高亮。
+        if (slot.isPlayerSlot && slot.IsOccupied && HasOccupiedNPCSlot())
+        {
+            Debug.Log($"[BattleFieldView] 玩家槽位 {slot.slotIndex} 已放牌，切换到攻击模式。");
+            SetMode(false);
+        }
+    }
+
+    private bool HasOccupiedNPCSlot()
+    {
+        if (npcSlots == null) return false;
+
+        foreach (var slot in npcSlots)
+        {
+            if (slot != null && slot.IsOccupied)
+                return true;
+        }
+
+        return false;
     }
 
     public void PlaceCardToNPCSlot(int slotIndex, CardView card, bool withAnimation = true)

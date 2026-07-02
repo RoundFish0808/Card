@@ -1,8 +1,13 @@
 using System.Collections.Generic;
+using System;
+using System.Collections;
 using UnityEngine;
 
 public class CardManager : MonoBehaviour
 {
+    private const int PlayerCardsPerSmallRound = 4;
+    private const int NPCCardsPerSmallRound = 3;
+
     [Header("全部卡牌数据（共 52 张 CardDataSO）")]
     public List<CardDataSO> allCards = new List<CardDataSO>();
 
@@ -18,9 +23,19 @@ public class CardManager : MonoBehaviour
 
     [Header("NPC 手牌控制")]
     public NPCPresenter npcPresenter;
-    public bool debugShowNpcCards = true;
+    public bool debugShowNpcCards = false;
     public bool autoDeclareOnStart = true;
     public float openingDeclarationDisplayTime = 5f;
+    public bool autoPlaceNpcCardsToSlots = true;
+
+    [Header("战场流程")]
+    public BattleFieldView battleField;
+    public AttackSystem attackSystem;
+    public bool enableGameFlow = true;
+
+    [Header("抽牌动画")]
+    public RectTransform playerDrawPileTransform;
+    public float drawToHandDuration = 0.45f;
 
     [Header("是否使用弧形手牌")]
     public bool useArcHand = true;
@@ -29,17 +44,59 @@ public class CardManager : MonoBehaviour
     private List<CardDataSO> playerHand = new List<CardDataSO>();
     private List<CardDataSO> npcHand = new List<CardDataSO>();
     private List<GameObject> playerHandObjects = new List<GameObject>();
+    private readonly List<CardDataSO> discardPile = new List<CardDataSO>();
+    private readonly List<CardDataSO> currentSmallRoundPlayerCards = new List<CardDataSO>();
+    private readonly IBattleCalculator battleCalculator = new StandardBattleCalculator();
+
+    private int playerTotalScore;
+    private int npcTotalScore;
+    private int currentSmallRoundPlayerRawScore;
+    private int currentSmallRoundNpcScore;
+    private int turnIndex;
+    private int smallRoundIndex;
+    private bool gameEnded;
+    private bool currentSmallRoundHasDrawnAttackReward;
+
+    public event Action<BattleResultData> OnTurnScored;
+    public event Action<int, int> OnTotalScoreChanged;
+    public event Action<int, int, BattleResult> OnGameEnded;
 
     private void Start()
     {
+        ResolveRuntimeReferences();
         CreateDeck();
         ShuffleDeck();
 
-        DrawPlayerCards(5);
-        DrawNPCCards(3);
+        DrawPlayerCards(PlayerCardsPerSmallRound);
         ShowPlayerCards();
-        ShowNPCCards();
-        ShowOpeningNPCDeclaration();
+
+        if (enableGameFlow)
+            StartNextSmallRound();
+    }
+
+    private void OnDestroy()
+    {
+        if (attackSystem != null)
+            attackSystem.OnAttackResolved -= HandleAttackResolved;
+    }
+
+    private void ResolveRuntimeReferences()
+    {
+        if (battleField == null)
+            battleField = FindObjectOfType<BattleFieldView>();
+
+        if (attackSystem == null)
+            attackSystem = FindObjectOfType<AttackSystem>();
+
+        if (npcPresenter == null)
+            npcPresenter = FindObjectOfType<NPCPresenter>();
+
+        if (attackSystem != null)
+        {
+            attackSystem.SetBattleCalculator(battleCalculator);
+            attackSystem.OnAttackResolved -= HandleAttackResolved;
+            attackSystem.OnAttackResolved += HandleAttackResolved;
+        }
     }
 
     private void CreateDeck()
@@ -61,7 +118,7 @@ public class CardManager : MonoBehaviour
     {
         for (int i = 0; i < deck.Count; i++)
         {
-            int randomIndex = Random.Range(i, deck.Count);
+            int randomIndex = UnityEngine.Random.Range(i, deck.Count);
 
             CardDataSO temp = deck[i];
             deck[i] = deck[randomIndex];
@@ -113,7 +170,7 @@ public class CardManager : MonoBehaviour
             }
         }
 
-        Debug.Log("NPC 初始手牌：" + FormatCardList(npcHand));
+        Debug.Log("NPC 本小局手牌：" + FormatCardList(npcHand));
     }
 
     private void ShowNPCCards()
@@ -137,22 +194,29 @@ public class CardManager : MonoBehaviour
 
     private void ShowOpeningNPCDeclaration()
     {
-        if (!autoDeclareOnStart) return;
-
         if (npcPresenter == null)
         {
             Debug.LogWarning("CardManager 没有找到 NPCPresenter，无法生成开局宣言");
             return;
         }
 
-        if (npcHand.Count < 3)
+        if (npcHand.Count < NPCCardsPerSmallRound)
         {
-            Debug.LogWarning("NPC 初始手牌不足 3 张，无法生成开局宣言");
+            Debug.LogWarning($"NPC 初始手牌不足 {NPCCardsPerSmallRound} 张，无法生成开局宣言");
             return;
         }
 
-        npcPresenter.GenerateAndShowDeclaration(openingDeclarationDisplayTime);
-        Debug.Log("NPC 已根据开局手牌生成宣言并显示");
+        if (autoDeclareOnStart)
+        {
+            npcPresenter.GenerateAndShowDeclaration(openingDeclarationDisplayTime);
+            Debug.Log("NPC 已根据开局手牌生成宣言并显示");
+        }
+
+        if (autoPlaceNpcCardsToSlots)
+        {
+            npcPresenter.PlaceArrangedCardsToNPCSlots();
+            Debug.Log("NPC 已按布阵结果放置到 Canvas/NpcSlots");
+        }
     }
 
     public void SetNPCDebugCardsVisible(bool visible)
@@ -164,6 +228,270 @@ public class CardManager : MonoBehaviour
 
         if (npcPresenter != null)
             npcPresenter.SetDebugShowFront(visible);
+    }
+
+    private void StartNextSmallRound()
+    {
+        if (gameEnded) return;
+
+        if (npcPresenter == null || battleField == null)
+        {
+            EndGame("NPC 或战场引用缺失，无法开始小局");
+            return;
+        }
+
+        int currentPlayerHandCount = GetCurrentPlayerHandCount();
+        if (currentPlayerHandCount > 0 && currentPlayerHandCount < PlayerCardsPerSmallRound)
+        {
+            EndGame($"玩家手牌不足 {PlayerCardsPerSmallRound} 张，无法开始下一小局");
+            return;
+        }
+
+        int requiredPlayerCards = currentPlayerHandCount == 0 ? PlayerCardsPerSmallRound : 0;
+        int requiredCards = NPCCardsPerSmallRound + requiredPlayerCards;
+        if (deck.Count < requiredCards)
+        {
+            EndGame($"牌库不足以开始下一小局：需要 NPC {NPCCardsPerSmallRound} 张 + 玩家 {requiredPlayerCards} 张，当前牌库 {deck.Count} 张");
+            return;
+        }
+
+        smallRoundIndex++;
+        currentSmallRoundPlayerRawScore = 0;
+        currentSmallRoundNpcScore = 0;
+        currentSmallRoundPlayerCards.Clear();
+        currentSmallRoundHasDrawnAttackReward = false;
+
+        DrawNPCCards(NPCCardsPerSmallRound);
+        ShowNPCCards();
+        ShowOpeningNPCDeclaration();
+
+        if (GetCurrentPlayerHandCount() == 0)
+        {
+            DrawPlayerCards(PlayerCardsPerSmallRound);
+            ShowPlayerCards();
+        }
+
+        if (GetCurrentPlayerHandCount() < PlayerCardsPerSmallRound)
+        {
+            EndGame($"玩家手牌不足 {PlayerCardsPerSmallRound} 张，无法开始下一小局");
+            return;
+        }
+
+        UpdateBattleModeAfterFlowChange();
+
+        Debug.Log($"[小局开始] 第 {smallRoundIndex} 小局，剩余牌库：{deck.Count}");
+    }
+
+    private void HandleAttackResolved(CardView attacker, CardView target, SlotView playerSlot, SlotView npcSlot, BattleResultData result)
+    {
+        if (gameEnded || attacker == null || target == null || playerSlot == null || npcSlot == null)
+            return;
+
+        turnIndex++;
+
+        currentSmallRoundPlayerCards.Add(attacker.CardData);
+        currentSmallRoundPlayerRawScore += result.playerScore;
+        currentSmallRoundNpcScore += result.npcScore;
+
+        OnTurnScored?.Invoke(result);
+
+        Debug.Log($"[回合 {turnIndex}] 玩家 {attacker.CardData.cardName} vs NPC {target.CardData.cardName}，玩家本回合+{result.playerScore}，NPC本回合+{result.npcScore}");
+
+        playerSlot.SetResolvedThisRound(true);
+        npcSlot.SetResolvedThisRound(true);
+
+        // 每个小局只有第一次攻击完成后奖励摸 1 张，后续攻击不再摸。
+        if (!currentSmallRoundHasDrawnAttackReward)
+        {
+            currentSmallRoundHasDrawnAttackReward = true;
+            DrawNewCard();
+        }
+
+        if (CountAvailableNPCSlotsForAttack() == 0)
+        {
+            CompleteSmallRound();
+            return;
+        }
+
+        if (!CanPlayerContinue())
+        {
+            EndGame("玩家已无可用卡牌且牌库耗尽，无法继续攻击");
+            return;
+        }
+
+        UpdateBattleModeAfterFlowChange();
+    }
+
+    private void DiscardAllSlotCards()
+    {
+        DiscardSlots(battleField != null ? battleField.playerSlots : null, "玩家");
+        DiscardSlots(battleField != null ? battleField.npcSlots : null, "NPC");
+        Debug.Log($"[弃牌堆] 当前弃牌数量：{discardPile.Count}");
+    }
+
+    private void DiscardSlots(SlotView[] slots, string ownerName)
+    {
+        if (slots == null) return;
+
+        foreach (var slot in slots)
+        {
+            if (slot == null || !slot.IsOccupied) continue;
+
+            CardView removed = slot.RemoveCard();
+            if (removed != null)
+            {
+                if (removed.CardData != null)
+                    discardPile.Add(removed.CardData);
+
+                Debug.Log($"[弃牌] {ownerName}槽位 {slot.slotIndex}: {(removed.CardData != null ? removed.CardData.cardName : "空牌")}");
+                Destroy(removed.gameObject);
+            }
+        }
+    }
+
+    private void ReturnPlayerHandToDeck()
+    {
+        int returnedCount = 0;
+
+        if (handController != null)
+        {
+            var handCardsSnapshot = new List<GameObject>(handController.Cards);
+            foreach (var cardObj in handCardsSnapshot)
+            {
+                if (cardObj == null) continue;
+
+                CardView cardView = cardObj.GetComponent<CardView>();
+                if (cardView != null && cardView.CardData != null)
+                {
+                    deck.Add(cardView.CardData);
+                    returnedCount++;
+                }
+            }
+
+            handController.ClearCards();
+        }
+
+        playerHand.Clear();
+        ShuffleDeck();
+
+        Debug.Log($"[回牌堆] 玩家未打出的手牌回到抽牌堆：{returnedCount} 张，当前牌库：{deck.Count}");
+    }
+
+    private void CompleteSmallRound()
+    {
+        float multiplier = ScoreMultiplierRules.GetMultiplier(currentSmallRoundPlayerCards, out string comboName);
+        int finalPlayerScore = Mathf.RoundToInt(currentSmallRoundPlayerRawScore * multiplier);
+
+        playerTotalScore += finalPlayerScore;
+        npcTotalScore += currentSmallRoundNpcScore;
+
+        Debug.Log($"[小局结算] 第 {smallRoundIndex} 小局：玩家原始分={currentSmallRoundPlayerRawScore}，牌型={comboName}，倍率=x{multiplier}，玩家入账={finalPlayerScore}，NPC入账={currentSmallRoundNpcScore}");
+        Debug.Log($"[总分] 玩家={playerTotalScore}，NPC={npcTotalScore}");
+
+        OnTotalScoreChanged?.Invoke(playerTotalScore, npcTotalScore);
+
+        DiscardAllSlotCards();
+        ReturnPlayerHandToDeck();
+
+        int requiredCardsForNextSmallRound = NPCCardsPerSmallRound + PlayerCardsPerSmallRound;
+        if (deck.Count < requiredCardsForNextSmallRound)
+        {
+            EndGame($"下一小局无法完整开始：NPC 需要 {NPCCardsPerSmallRound} 张，玩家需要 {PlayerCardsPerSmallRound} 张，当前牌库 {deck.Count} 张");
+            return;
+        }
+
+        StartNextSmallRound();
+    }
+
+    private bool CanPlayerContinue()
+    {
+        return CountAvailablePlayerSlotsForAttack() > 0 || GetCurrentPlayerHandCount() > 0;
+    }
+
+    private int CountOccupiedPlayerSlots()
+    {
+        if (battleField == null || battleField.playerSlots == null) return 0;
+
+        int count = 0;
+        foreach (var slot in battleField.playerSlots)
+        {
+            if (slot != null && slot.IsOccupied)
+                count++;
+        }
+
+        return count;
+    }
+
+    private int CountOccupiedNPCSlots()
+    {
+        if (battleField == null || battleField.npcSlots == null) return 0;
+
+        int count = 0;
+        foreach (var slot in battleField.npcSlots)
+        {
+            if (slot != null && slot.IsOccupied)
+                count++;
+        }
+
+        return count;
+    }
+
+    private int CountAvailablePlayerSlotsForAttack()
+    {
+        return CountAvailableSlotsForAttack(battleField != null ? battleField.playerSlots : null);
+    }
+
+    private int CountAvailableNPCSlotsForAttack()
+    {
+        return CountAvailableSlotsForAttack(battleField != null ? battleField.npcSlots : null);
+    }
+
+    private int CountAvailableSlotsForAttack(SlotView[] slots)
+    {
+        if (slots == null) return 0;
+
+        int count = 0;
+        foreach (var slot in slots)
+        {
+            if (slot != null && slot.IsOccupied && !slot.IsResolvedThisRound)
+                count++;
+        }
+
+        return count;
+    }
+
+    private int GetCurrentPlayerHandCount()
+    {
+        if (handController != null)
+            return handController.CardCount;
+
+        return playerHand.Count;
+    }
+
+    private void UpdateBattleModeAfterFlowChange()
+    {
+        if (battleField == null) return;
+
+        bool canAttack = CountAvailablePlayerSlotsForAttack() > 0 && CountAvailableNPCSlotsForAttack() > 0;
+        battleField.SetMode(!canAttack);
+    }
+
+    private void EndGame(string reason)
+    {
+        if (gameEnded) return;
+
+        gameEnded = true;
+        BattleResult finalResult = BattleResult.Draw;
+        if (playerTotalScore > npcTotalScore)
+            finalResult = BattleResult.Win;
+        else if (playerTotalScore < npcTotalScore)
+            finalResult = BattleResult.Lose;
+
+        if (battleField != null)
+            battleField.SetMode(true);
+
+        Debug.Log($"[大局结算] {reason}。最终比分：玩家={playerTotalScore}，NPC={npcTotalScore}，结果={finalResult}");
+        OnGameEnded?.Invoke(playerTotalScore, npcTotalScore, finalResult);
     }
 
     private string FormatCardList(List<CardDataSO> cards)
@@ -216,6 +544,7 @@ public class CardManager : MonoBehaviour
             }
 
             cardView.Init(playerHand[i]);
+            EnsurePlayerCardInteraction(cardObj, cardView);
             handController.AddCard(cardObj);
         }
 
@@ -308,11 +637,64 @@ public class CardManager : MonoBehaviour
 
         CardView cardView = cardObj.GetComponent<CardView>();
         if (cardView != null)
+        {
             cardView.Init(card);
+            EnsurePlayerCardInteraction(cardObj, cardView);
+        }
 
         if (useArcHand && handController != null)
         {
+            float oldDuration = handController.layoutAnimationDuration;
+            float drawDuration = Mathf.Max(0.01f, drawToHandDuration);
+            handController.layoutAnimationDuration = drawDuration;
+
+            PrepareDrawAnimationStart(cardObj);
             handController.AddCard(cardObj);
+            StartCoroutine(RestoreHandLayoutDurationAfterDraw(oldDuration, drawDuration));
         }
+    }
+
+    private void PrepareDrawAnimationStart(GameObject cardObj)
+    {
+        if (cardObj == null || handController == null) return;
+
+        RectTransform cardRect = cardObj.GetComponent<RectTransform>();
+        RectTransform handRect = handController.GetComponent<RectTransform>();
+        if (cardRect == null || handRect == null) return;
+
+        cardRect.SetParent(handController.transform, false);
+
+        // 摸牌动画起点：优先从配置的抽牌堆位置飞入；未配置时从手牌区上方缓慢进入。
+        if (playerDrawPileTransform != null)
+        {
+            cardRect.localPosition = handRect.InverseTransformPoint(playerDrawPileTransform.position);
+        }
+        else
+        {
+            cardRect.localPosition = new Vector3(0f, 260f, 0f);
+        }
+
+        cardRect.localScale = Vector3.zero;
+    }
+
+    private IEnumerator RestoreHandLayoutDurationAfterDraw(float oldDuration, float waitTime)
+    {
+        if (handController == null) yield break;
+
+        yield return new WaitForSeconds(waitTime);
+
+        if (handController != null)
+            handController.layoutAnimationDuration = oldDuration;
+    }
+
+    private void EnsurePlayerCardInteraction(GameObject cardObj, CardView cardView)
+    {
+        if (cardObj == null || cardView == null) return;
+
+        cardView.isPlayerCard = true;
+        cardView.Reveal();
+
+        if (cardObj.GetComponent<CardDragHandler>() == null)
+            cardObj.AddComponent<CardDragHandler>();
     }
 }

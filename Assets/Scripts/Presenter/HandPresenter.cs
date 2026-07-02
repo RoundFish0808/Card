@@ -317,20 +317,33 @@ public class HandPresenter : MonoBehaviour
     {
         if (battleField == null) return;
 
-        bool hasEmptySlot = battleField.HasEmptyPlayerSlots();
+        bool hasPlacedCard = HasAnyPlayerPlacedCard();
 
-        if (hasEmptySlot)
+        if (!hasPlacedCard)
         {
-            // 有空槽位：放置模式
+            // 没有已放置卡牌：保持放置模式，等待玩家拖牌进槽位。
             if (!battleField.isPlacementMode)
                 battleField.SetMode(true);
         }
         else
         {
-            // 没空槽位：攻击模式 + 提示
+            // 只要玩家至少放置了一张牌，就允许进入攻击模式；玩家仍可继续往空槽位拖牌。
             if (battleField.isPlacementMode)
                 battleField.SetMode(false);
         }
+    }
+
+    private bool HasAnyPlayerPlacedCard()
+    {
+        if (battleField == null || battleField.playerSlots == null) return false;
+
+        foreach (var slot in battleField.playerSlots)
+        {
+            if (slot != null && slot.IsOccupied)
+                return true;
+        }
+
+        return false;
     }
 
     public int CardCount => cardViews.Count;
