@@ -2,7 +2,111 @@ using System.Collections.Generic;
 using System;
 using System.Collections;
 using UnityEngine;
-
+using UnityEngine.UI;
+/// <summary>
+/// 卡牌游戏核心流程管理器(单一职责:牌堆与回合编排)。
+/// 本脚本不直接调用任何 UI 面板,通过事件 + 公共 API 与外部协作。
+/// 协作分工:[袁裕] 提供框架/字段/动画接口;[DRAIVORY] 负责事件订阅、UI 弹板、关卡难度。
+///
+/// ====================================================================================
+/// 【[袁裕] 任务清单 —— 框架与基础设施】
+/// ====================================================================================
+/// 1. 关卡索引字段
+///    - 新增 public int Level_index { get; private set; } = 0;
+///    - 由 [DRAIVORY] 在 StartNextLevel() 中自增,本类不主动修改
+///
+/// 2. 动画锚点字段(供 [DRAIVORY] 在 DOTween 动画中引用)
+///    [Header("动画锚点")]
+///    public Transform targetPointA;  // 牌堆起始位置(发牌动画起点)
+///    public Transform targetPointB;  // 牌堆结束位置(销牌动画终点)
+///    - targetPointA 在 ShowPlayerCards_Arc / DrawNewCard 中作为飞入起点
+///    - targetPointB 在 DiscardSlots 中作为销牌飞出终点
+///    - 若为空,回退到现有 playerDrawPileTransform / 默认位置
+///
+/// 3. 公共 API(供结算面板按钮注册)
+///    - public void RestartGame()          // 重新洗牌(同关卡)
+///    - public void StartNextLevel()       // 下一关(难度提升)
+///    - 内部复用 CreateDeck / ShuffleDeck / StartNextSmallRound,不重复造轮子
+///
+/// 4. 事件出口(已完成,仅声明)
+///    - OnTurnScored(BattleResultData)           单回合结算
+///    - OnTotalScoreChanged(int, int)            总分变化
+///    - OnGameEnded(int, int, BattleResult)      大局结束(含胜负)
+///
+/// 5. 作弊字段(供 [DRAIVORY] 每回合判断是否增加作弊利率)
+///    public bool IsCheatMode { get => _isCheatMode; }
+///    [SerializeField] private bool _isCheatMode = false;
+///    - 开启/关闭由 cheatBtn.onClick 在本类 Awake 中注册
+/// 
+/// 6. 发牌/销牌动画实现(DOTween)
+///    - 发牌动画(在 ShowPlayerCards_Arc / DrawNewCard 调用前/后):
+///      cardObj.transform.DOMove(targetPointA.position, drawToHandDuration)
+///                       .From();
+///    - 销牌动画(在 DiscardSlots 销毁 GameObject 前):
+///      removed.transform.DOMove(targetPointB.position, 0.3f)
+///                       .OnComplete(() => Destroy(removed.gameObject));
+///    - 引入 using DG.Tweening; 命名空间
+///
+/// ====================================================================================
+/// 【[DRAIVORY] 任务清单 —— 业务逻辑与 UI 调度】
+/// ====================================================================================
+/// 1. 小局结束 UI 调度
+///    - 触发点:订阅 OnTotalScoreChanged(或新增 OnSmallRoundEnded 事件)
+///    - 实现细节:
+///      a. 从事件参数读取玩家总分、NPC 总分
+///      b. 从 currentSmallRoundPlayerCards(需袁裕通过事件参数或 getter 暴露)
+///         计算 comboName 牌型(参考 ScoreMultiplierRules.GetMultiplier)
+///      c. 调用 UIManager.Instance.ShowPanel<smallEndPanel>(
+///             playerScore, npcScore, comboName)
+///    - 注意:不要重新计算分数,以 CardManager 传出为准(单一事实源)
+///
+/// 2. 大局结束 UI 调度
+///    - 触发点:订阅 OnGameEnded(playerTotal, npcTotal, BattleResult)
+///    - 实现细节:
+///      a. 根据 BattleResult 分流:
+///           Win  → UIManager.Instance.ShowPanel<bigEndPanel_suc>(playerTotal, npcTotal)
+///           Lose → UIManager.Instance.ShowPanel<bigEndPanel_fail>(playerTotal, npcTotal)
+///           Draw → 自行决定走 suc 还是 fail(建议归入 fail)
+///      b. 在面板按钮上注册:
+///           bigEndPanel_suc.下一关.onClick   → CardManager.Instance.StartNextLevel()
+///           bigEndPanel_fail.重新开始.onClick → CardManager.Instance.RestartGame()
+///
+/// 3. 关卡难度调整(在 StartNextLevel 内实现)
+///    - 思路:Level_index 自增,根据索引调整牌组规模
+///    - 实现细节:
+///      a. Level_index++;
+///      b. 难度公式(建议,可自行调整):
+///           int cardCount = Mathf.Min(52, 32 + Level_index * 4);  // 起步32张,每关+4
+///           或:从 allCards 中按 Level_index 取前 N 张作为本关牌池
+///      c. 重置 allCards 子集 → RestartGame() 内部会 CreateDeck + ShuffleDeck
+///      d. 可选:同步调整 PlayerCardsPerSmallRound / NPCCardsPerSmallRound
+///         (需要把 const 改为字段,袁裕已确认可改)
+///
+/// 4. 作弊利率递增(每回合判断)
+///    - 触发点:订阅 OnTurnScored
+///    - 实现细节:
+///      if (CardManager.Instance.IsCheatMode)
+///      {
+///          // 增加利率
+///      }
+///    - 注意:作弊逻辑写在 DRAIVORY 负责的模块中,不污染 CardManager
+///
+///
+/// ====================================================================================
+/// 【调用链路示意】
+/// ====================================================================================
+/// 小局结束:
+///   HandleAttackResolved → CompleteSmallRound
+///     → OnTotalScoreChanged 触发
+///     → [DRAIVORY] 订阅者 → ShowPanel<smallEndPanel>
+///
+/// 大局结束:
+///   EndGame → OnGameEnded 触发
+///     → [DRAIVORY] 订阅者 → ShowPanel<bigEndPanel_suc/fail>
+///     → 玩家点按钮 → CardManager.RestartGame() / StartNextLevel()
+///     → [DRAIVORY] 在 StartNextLevel 内调整 Level_index 与牌池
+///     → 重新进入 Start 流程
+/// </summary>
 public class CardManager : MonoBehaviour
 {
     private const int PlayerCardsPerSmallRound = 4;
@@ -40,6 +144,13 @@ public class CardManager : MonoBehaviour
     [Header("是否使用弧形手牌")]
     public bool useArcHand = true;
 
+    [Header("作弊按钮")]
+    public Button cheatBtn;//[袁裕]这个按钮作为作弊按钮,配合设计一个作弊字段
+    public bool IsCheatMode { get => _isCheatMode; }
+   [SerializeField] private bool _isCheatMode = false;//[DRAIVORY]这个字段你需要借助,作为每一回合是否增加作弊利率的判断
+
+    
+
     private List<CardDataSO> deck = new List<CardDataSO>();
     private List<CardDataSO> playerHand = new List<CardDataSO>();
     private List<CardDataSO> npcHand = new List<CardDataSO>();
@@ -72,6 +183,11 @@ public class CardManager : MonoBehaviour
 
         if (enableGameFlow)
             StartNextSmallRound();
+        
+        //不随着场景切换而销毁
+        //[袁裕]需要看你是否连续使用CardManager作为场景跳转,如果此Manager作为全局Manager需要设计根据场景切换重新洗牌的逻辑
+        //我这边设计的逻辑是不进行场景切换,需要请你在bigEndPanel_suc和bigEndPanel_fail中重新洗牌
+        //DontDestroyOnLoad(this);
     }
 
     private void OnDestroy()
@@ -155,6 +271,8 @@ public class CardManager : MonoBehaviour
             }
         }
     }
+
+
 
     private void DrawNPCCards(int count)
     {

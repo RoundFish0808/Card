@@ -3,10 +3,10 @@ using UnityEngine;
 [System.Serializable]
 public class CardData
 {
-    public int id;        // Î¨Ò»±àºÅ£¬0-51
-    public Suit suit;     // »¨É«
-    public Rank rank;     // µãÊı
-    public Sprite sprite; // ÅÆÍ¼£¬³õÆÚ¿ÉÒÔÎª¿Õ
+    public int id;        // å”¯ä¸€ç¼–å·ï¼Œ0-51
+    public Suit suit;     // èŠ±è‰²
+    public Rank rank;     // ç‚¹æ•°
+    public Sprite sprite; // ç‰Œå›¾ï¼ŒåˆæœŸå¯ä»¥ä¸ºç©º
 
     public CardData(int id, Suit suit, Rank rank, Sprite sprite = null)
     {
@@ -26,13 +26,13 @@ public class CardData
         switch (suit)
         {
             case Suit.Spade:
-                return "ºÚÌÒ";
+                return "é»‘æ¡ƒ";
             case Suit.Heart:
-                return "ºìÌÒ";
+                return "çº¢æ¡ƒ";
             case Suit.Diamond:
-                return "·½¿é";
+                return "æ–¹å—";
             case Suit.Club:
-                return "Ã·»¨";
+                return "æ¢…èŠ±";
             default:
                 return "";
         }
