@@ -110,6 +110,7 @@ using UnityEngine.UI;
 public class CardManager : MonoBehaviour
 {
     public static CardManager Instance { get; private set; }
+    public int Level_index { get; private set; } = 0;
 
     private const int PlayerCardsPerSmallRound = 4;
     private const int NPCCardsPerSmallRound = 3;
@@ -148,6 +149,9 @@ public class CardManager : MonoBehaviour
     [Header("是否使用弧形手牌")]
     public bool useArcHand = true;
 
+    [Header("Economy Score")]
+    public int initialPrincipalScore = 5000;
+
     [Header("作弊按钮")]
     public Button cheatBtn;//[袁裕]这个按钮作为作弊按钮,配合设计一个作弊字段
     public Button cheatButton;
@@ -156,6 +160,7 @@ public class CardManager : MonoBehaviour
 
     
 
+    private List<CardDataSO> levelSourceCards = new List<CardDataSO>();
     private List<CardDataSO> deck = new List<CardDataSO>();
     private List<CardDataSO> playerHand = new List<CardDataSO>();
     private List<CardDataSO> npcHand = new List<CardDataSO>();
@@ -167,14 +172,31 @@ public class CardManager : MonoBehaviour
     private int playerTotalScore;
     private int npcTotalScore;
     private int currentSmallRoundPlayerRawScore;
+    private int currentSmallRoundWinDiffScore;
     private int currentSmallRoundNpcScore;
+    private int lastSmallRoundPlayerScore;
+    private int lastSmallRoundPrincipal;
+    private int lastSmallRoundWinDiffScore;
+    private int lastSmallRoundFormulaBase;
     private int turnIndex;
     private int smallRoundIndex;
     private int smallRoundCheatUseCount;
     private int totalCheatUseCount;
     private bool gameEnded;
     private bool currentSmallRoundHasDrawnAttackReward;
+    private bool currentSmallRoundConfirmedCheat;
     private bool waitingForSmallRoundContinue;
+
+    public IReadOnlyList<CardDataSO> CurrentSmallRoundPlayerCards => currentSmallRoundPlayerCards.AsReadOnly();
+    public bool CurrentSmallRoundUsedCheat => currentSmallRoundConfirmedCheat;
+    public int PlayerTotalScore => playerTotalScore;
+    public int NpcBattleTotalScore => npcTotalScore;
+    public int SmallRoundIndex => smallRoundIndex;
+    public int TurnIndex => turnIndex;
+    public int LastSmallRoundPlayerScore => lastSmallRoundPlayerScore;
+    public int LastSmallRoundPrincipal => lastSmallRoundPrincipal;
+    public int LastSmallRoundWinDiffScore => lastSmallRoundWinDiffScore;
+    public int LastSmallRoundFormulaBase => lastSmallRoundFormulaBase;
 
     public event Action<BattleResultData> OnTurnScored;
     public event Action<int, int> OnTotalScoreChanged;
@@ -183,6 +205,9 @@ public class CardManager : MonoBehaviour
     private void Awake()
     {
         Instance = this;
+        levelSourceCards = new List<CardDataSO>(allCards);
+        playerTotalScore = 0;
+        lastSmallRoundPrincipal = initialPrincipalScore;
     }
 
     private void Start()
@@ -457,9 +482,11 @@ public class CardManager : MonoBehaviour
 
         smallRoundIndex++;
         currentSmallRoundPlayerRawScore = 0;
+        currentSmallRoundWinDiffScore = 0;
         currentSmallRoundNpcScore = 0;
         currentSmallRoundPlayerCards.Clear();
         currentSmallRoundHasDrawnAttackReward = false;
+        currentSmallRoundConfirmedCheat = false;
         smallRoundCheatUseCount = 0;
 
         DrawNPCCards(NPCCardsPerSmallRound);
@@ -499,7 +526,9 @@ public class CardManager : MonoBehaviour
         turnIndex++;
 
         currentSmallRoundPlayerCards.Add(attacker.CardData);
-        currentSmallRoundPlayerRawScore += result.playerScore;
+        int winDiffScore = result.result == BattleResult.Win ? Mathf.Max(0, result.playerScore - result.baseScore) : 0;
+        currentSmallRoundWinDiffScore += winDiffScore;
+        currentSmallRoundPlayerRawScore += winDiffScore;
         currentSmallRoundNpcScore += result.npcScore;
 
         OnTurnScored?.Invoke(result);
@@ -589,7 +618,15 @@ public class CardManager : MonoBehaviour
     private void CompleteSmallRound()
     {
         float multiplier = ScoreMultiplierRules.GetMultiplier(currentSmallRoundPlayerCards, out string comboName);
-        int finalPlayerScore = Mathf.RoundToInt(currentSmallRoundPlayerRawScore * multiplier);
+        GameEconomyBridge economyForScore = GameEconomyBridge.Instance;
+        int principal = economyForScore != null ? economyForScore.CurrentBetAmount : initialPrincipalScore;
+        int formulaBase = currentSmallRoundWinDiffScore + 6;
+        int finalPlayerScore = Mathf.RoundToInt(formulaBase * multiplier * principal);
+
+        lastSmallRoundPrincipal = principal;
+        lastSmallRoundWinDiffScore = currentSmallRoundWinDiffScore;
+        lastSmallRoundFormulaBase = formulaBase;
+        lastSmallRoundPlayerScore = finalPlayerScore;
 
         playerTotalScore += finalPlayerScore;
         npcTotalScore += currentSmallRoundNpcScore;
@@ -599,15 +636,40 @@ public class CardManager : MonoBehaviour
 
         OnTotalScoreChanged?.Invoke(playerTotalScore, npcTotalScore);
 
-        // NPC 三张牌全部被攻击后，弹出小局结算面板，等待玩家确认后再进入下一小局。
-        StartCoroutine(ShowSmallEndPanelAfterDelay(smallRoundEndPanelDelay));
+        // NPC 三张牌全部被攻击后，按经济系统决定是否弹出阶段结算面板。
+        GameEconomyBridge economy = GameEconomyBridge.Instance;
+        if (economy != null && economy.IsBigGameEnded)
+        {
+            gameEnded = true;
+            if (battleField != null)
+                battleField.SetSlotsInteractable(false);
+            return;
+        }
 
-        StartCoroutine(ShowSmallEndPanelAfterDelay(smallRoundEndPanelDelay));
+        bool shouldPauseForPanel = economy == null || economy.ShouldPauseForSmallPanel;
+        if (!shouldPauseForPanel)
+        {
+            StartCoroutine(ContinueAfterSmallRoundDelay(smallRoundEndPanelDelay));
+            return;
+        }
+
         waitingForSmallRoundContinue = true;
         if (battleField != null)
             battleField.SetSlotsInteractable(false);
 
+        StartCoroutine(ShowSmallEndPanelAfterDelay(smallRoundEndPanelDelay));
+
         Debug.Log("[小局暂停] NPC 三张牌已全部翻开，等待 smallEndPanel 按钮确认后进入下一小局。");
+    }
+
+    private IEnumerator ContinueAfterSmallRoundDelay(float delaySeconds)
+    {
+        yield return new WaitForSecondsRealtime(delaySeconds);
+
+        if (waitingForSmallRoundContinue || gameEnded)
+            yield break;
+
+        ContinueAfterSmallRoundInternal();
     }
 
     private IEnumerator ShowSmallEndPanelAfterDelay(float delaySeconds)
@@ -615,12 +677,12 @@ public class CardManager : MonoBehaviour
         // 等待几秒，让玩家先看清 NPC 第三张被翻开的牌。
         yield return new WaitForSecondsRealtime(delaySeconds);
 
-        yield return new WaitForSecondsRealtime(delaySeconds);
-
         if (!waitingForSmallRoundContinue || gameEnded)
             yield break;
 
-        UIManager.Instance.ShowPanel<smallEndPanel>();
+        smallEndPanel panel = UIManager.Instance.ShowPanel<smallEndPanel>();
+        if (panel != null && GameEconomyBridge.Instance != null)
+            panel.SetData(GameEconomyBridge.Instance.LatestSmallPanelResult);
     }
 
     public void ContinueAfterSmallRound()
@@ -630,6 +692,11 @@ public class CardManager : MonoBehaviour
 
         waitingForSmallRoundContinue = false;
 
+        ContinueAfterSmallRoundInternal();
+    }
+
+    private void ContinueAfterSmallRoundInternal()
+    {
         DiscardAllSlotCards();
         ReturnPlayerHandToDeck();
 
@@ -641,6 +708,65 @@ public class CardManager : MonoBehaviour
         }
 
         StartNextSmallRound();
+    }
+
+    public void RestartGame()
+    {
+        RestartGame(false);
+    }
+
+    private void RestartGame(bool useNextGameSettlement)
+    {
+        StopAllCoroutines();
+
+        gameEnded = false;
+        waitingForSmallRoundContinue = false;
+        playerTotalScore = 0;
+        npcTotalScore = 0;
+        currentSmallRoundPlayerRawScore = 0;
+        currentSmallRoundWinDiffScore = 0;
+        currentSmallRoundNpcScore = 0;
+        lastSmallRoundPlayerScore = 0;
+        lastSmallRoundPrincipal = initialPrincipalScore;
+        lastSmallRoundWinDiffScore = 0;
+        lastSmallRoundFormulaBase = 0;
+        turnIndex = 0;
+        smallRoundIndex = 0;
+        smallRoundCheatUseCount = 0;
+        totalCheatUseCount = 0;
+        currentSmallRoundConfirmedCheat = false;
+        currentSmallRoundHasDrawnAttackReward = false;
+        discardPile.Clear();
+        currentSmallRoundPlayerCards.Clear();
+
+        DiscardAllSlotCards();
+        ClearPlayerHandObjects();
+        playerHand.Clear();
+        npcHand.Clear();
+
+        GameEconomyBridge.Instance?.ResetEconomyState(useNextGameSettlement);
+
+        CreateDeck();
+        ShuffleDeck();
+        DrawPlayerCards(PlayerCardsPerSmallRound);
+        ShowPlayerCards();
+
+        if (enableGameFlow)
+            StartNextSmallRound();
+    }
+
+    public void StartNextLevel()
+    {
+        Level_index++;
+
+        if (levelSourceCards == null || levelSourceCards.Count == 0)
+            levelSourceCards = new List<CardDataSO>(allCards);
+
+        int cardCount = Mathf.Min(levelSourceCards.Count, 32 + Level_index * 4);
+        allCards = levelSourceCards.GetRange(0, cardCount);
+
+        GameEconomyBridge.Instance?.PrepareNextGameFromLatestSettlement();
+        RestartGame(true);
     }
 
     private bool CanPlayerContinue()
@@ -913,6 +1039,7 @@ public class CardManager : MonoBehaviour
 
         AddCardToPlayerHand(selectedCard, true);
         ReturnCheatOptionsToDeck(options, selectedCard);
+        currentSmallRoundConfirmedCheat = true;
 
         Debug.Log($"[作弊] 玩家选择作弊牌：{selectedCard.cardName}，当前手牌数：{GetCurrentPlayerHandCount()}，剩余牌堆：{deck.Count}");
     }

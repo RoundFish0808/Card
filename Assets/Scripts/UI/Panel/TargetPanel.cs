@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -8,10 +6,59 @@ public class TargetPanel : BasePanel
     public Text targetScore;
     public Text curScore;
     public Text vigScore;
+
+    private bool subscribed;
+
     public override void Init()
     {
-        targetScore.text="目标:";//[DRAIVORY]这里需要你+一个计算系统的结果
-        curScore.text="得分:";
-        vigScore.text="利率";
+        TrySubscribe();
+        Refresh();
+    }
+
+    private void OnDestroy()
+    {
+        if (subscribed && GameEconomyBridge.Instance != null)
+            GameEconomyBridge.Instance.OnEconomyChanged -= Refresh;
+    }
+
+    private void LateUpdate()
+    {
+        if (subscribed)
+            return;
+
+        if (TrySubscribe())
+            Refresh();
+    }
+
+    private bool TrySubscribe()
+    {
+        if (subscribed || GameEconomyBridge.Instance == null)
+            return subscribed;
+
+        GameEconomyBridge.Instance.OnEconomyChanged += Refresh;
+        subscribed = true;
+        return true;
+    }
+
+    private void Refresh()
+    {
+        GameEconomyBridge economy = GameEconomyBridge.Instance;
+        if (economy == null)
+        {
+            SetText(targetScore, "\u76ee\u6807:");
+            SetText(curScore, "\u5f97\u5206:");
+            SetText(vigScore, "\u5229\u7387:");
+            return;
+        }
+
+        SetText(targetScore, "\u76ee\u6807:" + economy.TargetScore);
+        SetText(curScore, "\u5f97\u5206:" + economy.PlayerTotalScore);
+        SetText(vigScore, "\u5229\u7387:" + economy.CurrentInterestRate.ToString("P0"));
+    }
+
+    private void SetText(Text target, string value)
+    {
+        if (target != null)
+            target.text = value;
     }
 }
