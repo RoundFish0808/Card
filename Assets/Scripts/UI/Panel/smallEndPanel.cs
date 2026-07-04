@@ -14,6 +14,7 @@ public class smallEndPanel : BasePanel
     {
         continueBtn.onClick.AddListener(() =>
         {
+            CardManager.Instance?.ContinueAfterSmallRound();
             UIManager.Instance.HidePanel<smallEndPanel>();
         });
         //[DRAIVORY]这里需要你+一个计算系统的结果2

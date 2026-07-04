@@ -266,6 +266,19 @@ public class CardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, I
     /// </summary>
     private SlotView FindNearestEmptySlot()
     {
+        BattleFieldView battleField = FindObjectOfType<BattleFieldView>();
+        if (battleField != null)
+        {
+            // 攻击模式下不能继续放牌；玩家必须先完成当前这张牌的攻击。
+            if (!battleField.isPlacementMode)
+                return null;
+
+            // 放置模式下也只允许本次放置 1 张未结算的玩家牌。
+            // 防止因为模式切换延迟或外部调用导致玩家连续塞多张牌。
+            if (HasUnresolvedPlayerCardOnField(battleField))
+                return null;
+        }
+
         SlotView[] allSlots = FindObjectsOfType<SlotView>();
         if (allSlots == null || allSlots.Length == 0) return null;
 
@@ -288,6 +301,19 @@ public class CardDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, I
         }
 
         return nearest;
+    }
+
+    private bool HasUnresolvedPlayerCardOnField(BattleFieldView battleField)
+    {
+        if (battleField == null || battleField.playerSlots == null) return false;
+
+        foreach (var slot in battleField.playerSlots)
+        {
+            if (slot != null && slot.IsOccupied && !slot.IsResolvedThisRound)
+                return true;
+        }
+
+        return false;
     }
 
     private void PlaceToSlot(SlotView slot)

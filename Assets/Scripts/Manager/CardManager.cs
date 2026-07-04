@@ -109,6 +109,8 @@ using UnityEngine.UI;
 /// </summary>
 public class CardManager : MonoBehaviour
 {
+    public static CardManager Instance { get; private set; }
+
     private const int PlayerCardsPerSmallRound = 4;
     private const int NPCCardsPerSmallRound = 3;
 
@@ -136,16 +138,19 @@ public class CardManager : MonoBehaviour
     public BattleFieldView battleField;
     public AttackSystem attackSystem;
     public bool enableGameFlow = true;
+    public float smallRoundEndPanelDelay = 2f;
 
     [Header("抽牌动画")]
     public RectTransform playerDrawPileTransform;
     public float drawToHandDuration = 0.45f;
+    public string playerDrawPileObjectName = "DeckCardPos";
 
     [Header("是否使用弧形手牌")]
     public bool useArcHand = true;
 
     [Header("作弊按钮")]
     public Button cheatBtn;//[袁裕]这个按钮作为作弊按钮,配合设计一个作弊字段
+    public Button cheatButton;
     public bool IsCheatMode { get => _isCheatMode; }
    [SerializeField] private bool _isCheatMode = false;//[DRAIVORY]这个字段你需要借助,作为每一回合是否增加作弊利率的判断
 
@@ -165,12 +170,20 @@ public class CardManager : MonoBehaviour
     private int currentSmallRoundNpcScore;
     private int turnIndex;
     private int smallRoundIndex;
+    private int smallRoundCheatUseCount;
+    private int totalCheatUseCount;
     private bool gameEnded;
     private bool currentSmallRoundHasDrawnAttackReward;
+    private bool waitingForSmallRoundContinue;
 
     public event Action<BattleResultData> OnTurnScored;
     public event Action<int, int> OnTotalScoreChanged;
     public event Action<int, int, BattleResult> OnGameEnded;
+
+    private void Awake()
+    {
+        Instance = this;
+    }
 
     private void Start()
     {
@@ -192,6 +205,9 @@ public class CardManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (Instance == this)
+            Instance = null;
+
         if (attackSystem != null)
             attackSystem.OnAttackResolved -= HandleAttackResolved;
     }
@@ -207,12 +223,77 @@ public class CardManager : MonoBehaviour
         if (npcPresenter == null)
             npcPresenter = FindObjectOfType<NPCPresenter>();
 
+        ResolveDrawPileTransform();
+        RegisterCheatButton();
+
         if (attackSystem != null)
         {
             attackSystem.SetBattleCalculator(battleCalculator);
             attackSystem.OnAttackResolved -= HandleAttackResolved;
             attackSystem.OnAttackResolved += HandleAttackResolved;
         }
+    }
+
+    private void RegisterCheatButton()
+    {
+        if (cheatButton == null)
+            cheatButton = cheatBtn;
+
+        if (cheatButton == null)
+        {
+            GameObject buttonObj = GameObject.Find("cheatButton");
+            if (buttonObj != null)
+                cheatButton = buttonObj.GetComponent<Button>();
+        }
+
+        if (cheatButton == null)
+        {
+            Debug.LogWarning("CardManager 没有找到 cheatButton，作弊面板不会自动打开");
+            return;
+        }
+
+        cheatButton.onClick.RemoveListener(OpenCheatPanel);
+        cheatButton.onClick.AddListener(OpenCheatPanel);
+    }
+
+    private void OpenCheatPanel()
+    {
+        if (gameEnded || waitingForSmallRoundContinue)
+        {
+            Debug.LogWarning("[作弊] 当前不是可作弊状态");
+            return;
+        }
+
+        if (smallRoundCheatUseCount >= 1)
+        {
+            Debug.LogWarning($"[作弊] 本小局只能作弊一次。当前小局作弊次数：{smallRoundCheatUseCount}，总作弊次数：{totalCheatUseCount}");
+            return;
+        }
+
+        if (deck.Count <= 0)
+        {
+            Debug.LogWarning("[作弊] 抽牌堆为空，无法打开作弊面板");
+            return;
+        }
+
+        UIManager.Instance.ShowPanel<cheatPanel>();
+    }
+
+    private void ResolveDrawPileTransform()
+    {
+        if (playerDrawPileTransform != null) return;
+        if (string.IsNullOrEmpty(playerDrawPileObjectName)) return;
+
+        GameObject drawPileObj = GameObject.Find(playerDrawPileObjectName);
+        if (drawPileObj == null)
+        {
+            Debug.LogWarning($"CardManager 没有找到抽牌动画起点：{playerDrawPileObjectName}");
+            return;
+        }
+
+        playerDrawPileTransform = drawPileObj.GetComponent<RectTransform>();
+        if (playerDrawPileTransform == null)
+            Debug.LogWarning($"抽牌动画起点 {playerDrawPileObjectName} 没有 RectTransform，无法作为 UI 动画起点");
     }
 
     private void CreateDeck()
@@ -351,6 +432,7 @@ public class CardManager : MonoBehaviour
     private void StartNextSmallRound()
     {
         if (gameEnded) return;
+        waitingForSmallRoundContinue = false;
 
         if (npcPresenter == null || battleField == null)
         {
@@ -378,6 +460,7 @@ public class CardManager : MonoBehaviour
         currentSmallRoundNpcScore = 0;
         currentSmallRoundPlayerCards.Clear();
         currentSmallRoundHasDrawnAttackReward = false;
+        smallRoundCheatUseCount = 0;
 
         DrawNPCCards(NPCCardsPerSmallRound);
         ShowNPCCards();
@@ -395,6 +478,11 @@ public class CardManager : MonoBehaviour
             return;
         }
 
+        // 小局暂停时会关闭场上交互，进入下一小局后需要重新打开。
+        if (battleField != null)
+        if (battleField != null)
+            battleField.SetSlotsInteractable(true);
+
         UpdateBattleModeAfterFlowChange();
 
         Debug.Log($"[小局开始] 第 {smallRoundIndex} 小局，剩余牌库：{deck.Count}");
@@ -402,6 +490,9 @@ public class CardManager : MonoBehaviour
 
     private void HandleAttackResolved(CardView attacker, CardView target, SlotView playerSlot, SlotView npcSlot, BattleResultData result)
     {
+        if (waitingForSmallRoundContinue)
+            return;
+
         if (gameEnded || attacker == null || target == null || playerSlot == null || npcSlot == null)
             return;
 
@@ -507,6 +598,37 @@ public class CardManager : MonoBehaviour
         Debug.Log($"[总分] 玩家={playerTotalScore}，NPC={npcTotalScore}");
 
         OnTotalScoreChanged?.Invoke(playerTotalScore, npcTotalScore);
+
+        // NPC 三张牌全部被攻击后，弹出小局结算面板，等待玩家确认后再进入下一小局。
+        StartCoroutine(ShowSmallEndPanelAfterDelay(smallRoundEndPanelDelay));
+
+        StartCoroutine(ShowSmallEndPanelAfterDelay(smallRoundEndPanelDelay));
+        waitingForSmallRoundContinue = true;
+        if (battleField != null)
+            battleField.SetSlotsInteractable(false);
+
+        Debug.Log("[小局暂停] NPC 三张牌已全部翻开，等待 smallEndPanel 按钮确认后进入下一小局。");
+    }
+
+    private IEnumerator ShowSmallEndPanelAfterDelay(float delaySeconds)
+    {
+        // 等待几秒，让玩家先看清 NPC 第三张被翻开的牌。
+        yield return new WaitForSecondsRealtime(delaySeconds);
+
+        yield return new WaitForSecondsRealtime(delaySeconds);
+
+        if (!waitingForSmallRoundContinue || gameEnded)
+            yield break;
+
+        UIManager.Instance.ShowPanel<smallEndPanel>();
+    }
+
+    public void ContinueAfterSmallRound()
+    {
+        if (!waitingForSmallRoundContinue || gameEnded)
+            return;
+
+        waitingForSmallRoundContinue = false;
 
         DiscardAllSlotCards();
         ReturnPlayerHandToDeck();
@@ -743,6 +865,103 @@ public class CardManager : MonoBehaviour
         }
     }
 
+    public List<CardDataSO> StartCheatSelection(int count)
+    {
+        List<CardDataSO> options = new List<CardDataSO>();
+
+        if (gameEnded || waitingForSmallRoundContinue)
+        {
+            Debug.LogWarning("[作弊] 当前流程不能作弊");
+            return options;
+        }
+
+        if (smallRoundCheatUseCount >= 1)
+        {
+            Debug.LogWarning($"[作弊] 本小局已经作弊过，本小局作弊次数：{smallRoundCheatUseCount}，总作弊次数：{totalCheatUseCount}");
+            return options;
+        }
+
+        int drawCount = Mathf.Min(count, deck.Count);
+        if (drawCount <= 0)
+        {
+            Debug.LogWarning("[作弊] 抽牌堆为空，无法生成作弊候选牌");
+            return options;
+        }
+
+        for (int i = 0; i < drawCount; i++)
+        {
+            CardDataSO card = DrawCard();
+            if (card != null)
+                options.Add(card);
+        }
+
+        smallRoundCheatUseCount++;
+        totalCheatUseCount++;
+        Debug.Log($"[作弊] 当前小局作弊次数：{smallRoundCheatUseCount}，总作弊次数：{totalCheatUseCount}，候选牌数量：{options.Count}");
+
+        return options;
+    }
+
+    public void ConfirmCheatSelection(CardDataSO selectedCard, List<CardDataSO> options)
+    {
+        if (selectedCard == null || options == null || !options.Contains(selectedCard))
+        {
+            Debug.LogWarning("[作弊] 没有选择有效卡牌，无法加入手牌");
+            ReturnCheatOptionsToDeck(options, null);
+            return;
+        }
+
+        AddCardToPlayerHand(selectedCard, true);
+        ReturnCheatOptionsToDeck(options, selectedCard);
+
+        Debug.Log($"[作弊] 玩家选择作弊牌：{selectedCard.cardName}，当前手牌数：{GetCurrentPlayerHandCount()}，剩余牌堆：{deck.Count}");
+    }
+
+    public void CancelCheatSelection(List<CardDataSO> options)
+    {
+        ReturnCheatOptionsToDeck(options, null);
+        Debug.Log("[作弊] 作弊面板关闭，候选牌已放回抽牌堆");
+    }
+
+    private void ReturnCheatOptionsToDeck(List<CardDataSO> options, CardDataSO selectedCard)
+    {
+        if (options == null) return;
+
+        foreach (CardDataSO card in options)
+        {
+            if (card != null && card != selectedCard)
+                deck.Add(card);
+        }
+    }
+
+    private void AddCardToPlayerHand(CardDataSO card, bool animateFromDeck)
+    {
+        if (card == null || cardPrefab == null) return;
+
+        playerHand.Add(card);
+
+        GameObject cardObj = Instantiate(cardPrefab);
+        playerHandObjects.Add(cardObj);
+
+        CardView cardView = cardObj.GetComponent<CardView>();
+        if (cardView != null)
+        {
+            cardView.Init(card);
+            EnsurePlayerCardInteraction(cardObj, cardView);
+        }
+
+        if (useArcHand && handController != null)
+        {
+            if (animateFromDeck)
+                PrepareDrawAnimationStart(cardObj);
+
+            handController.AddCard(cardObj);
+            return;
+        }
+
+        ShowPlayerCards();
+    }
+
     public void DrawNewCard()
     {
         CardDataSO card = DrawCard();
@@ -777,22 +996,24 @@ public class CardManager : MonoBehaviour
         if (cardObj == null || handController == null) return;
 
         RectTransform cardRect = cardObj.GetComponent<RectTransform>();
-        RectTransform handRect = handController.GetComponent<RectTransform>();
-        if (cardRect == null || handRect == null) return;
+        if (cardRect == null) return;
+
+        ResolveDrawPileTransform();
 
         cardRect.SetParent(handController.transform, false);
 
-        // 摸牌动画起点：优先从配置的抽牌堆位置飞入；未配置时从手牌区上方缓慢进入。
+        // 摸牌动画起点：优先从 Canvas/DeckCardPos 平移进手牌；未配置时从手牌区上方进入。
         if (playerDrawPileTransform != null)
         {
-            cardRect.localPosition = handRect.InverseTransformPoint(playerDrawPileTransform.position);
+            cardRect.position = playerDrawPileTransform.position;
         }
         else
         {
             cardRect.localPosition = new Vector3(0f, 260f, 0f);
         }
 
-        cardRect.localScale = Vector3.zero;
+        cardRect.localRotation = Quaternion.identity;
+        cardRect.localScale = Vector3.one;
     }
 
     private IEnumerator RestoreHandLayoutDurationAfterDraw(float oldDuration, float waitTime)

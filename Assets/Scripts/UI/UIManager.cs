@@ -33,7 +33,20 @@ public class UIManager
 
         //显示面板 就是 动态的创建面板预设体 设置父对象
         //根据得到的 类名 就是我们的预设体面板明 直接 动态创建它 即可
-        GameObject panelObj = GameObject.Instantiate(Resources.Load<GameObject>("UI/" + panelName));
+        GameObject panelPrefab = Resources.Load<GameObject>("UI/" + panelName);
+        if (panelPrefab == null && !string.IsNullOrEmpty(panelName))
+        {
+            string upperFirstName = char.ToUpper(panelName[0]) + panelName.Substring(1);
+            panelPrefab = Resources.Load<GameObject>("UI/" + upperFirstName);
+        }
+
+        if (panelPrefab == null)
+        {
+            Debug.LogError("UIManager 找不到面板预制体：Resources/UI/" + panelName);
+            return null;
+        }
+
+        GameObject panelObj = GameObject.Instantiate(panelPrefab);
         panelObj.transform.SetParent(canvasTrans, false);
 
         //接着 就是得到对应的面板脚本 存储起来
