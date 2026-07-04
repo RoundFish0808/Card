@@ -3,6 +3,8 @@ using UnityEngine.UI;
 
 public class bigEndPanel_fail : BasePanel, IBigEndPanelDataReceiver
 {
+    private const string FailAmountColor = "#E74C3C";
+
     public Button reStartBtn;
     public Text titleText;
     public Text totalScoreText;
@@ -14,15 +16,8 @@ public class bigEndPanel_fail : BasePanel, IBigEndPanelDataReceiver
 
     public override void Init()
     {
-        if (reStartBtn != null)
-        {
-            reStartBtn.onClick.RemoveAllListeners();
-            reStartBtn.onClick.AddListener(() =>
-            {
-                CardManager.Instance?.RestartGame();
-                UIManager.Instance.HidePanel<bigEndPanel_fail>();
-            });
-        }
+        ResolveExternalComponents();
+        RegisterButton();
 
         if (Data == null && GameEconomyBridge.Instance != null)
             Data = GameEconomyBridge.Instance.LatestBigPanelResult;
@@ -33,7 +28,22 @@ public class bigEndPanel_fail : BasePanel, IBigEndPanelDataReceiver
     public void SetData(BigPanelResultData data)
     {
         Data = data;
+        ResolveExternalComponents();
+        RegisterButton();
         ApplyData();
+    }
+
+    private void RegisterButton()
+    {
+        if (reStartBtn == null)
+            return;
+
+        reStartBtn.onClick.RemoveAllListeners();
+        reStartBtn.onClick.AddListener(() =>
+        {
+            CardManager.Instance?.RestartGame();
+            UIManager.Instance.HidePanel<bigEndPanel_fail>();
+        });
     }
 
     private void ApplyData()
@@ -42,22 +52,77 @@ public class bigEndPanel_fail : BasePanel, IBigEndPanelDataReceiver
 
         if (Data == null)
         {
-            SetText(totalScoreText, "总金额:");
+            SetText(totalScoreText, "本局金额:");
             SetText(baseInterestText, "基础利率:");
             SetText(cheatInterestText, "出千利率:");
-            SetText(finalSettlementText, "最终结算金额:");
+            SetText(finalSettlementText, FormatColoredValue("结算金额:", "", FailAmountColor));
             return;
         }
 
-        SetText(totalScoreText, "总金额:" + Data.BigRoundScore);
+        SetText(totalScoreText, "本局金额:" + Data.BigRoundScore);
         SetText(baseInterestText, "基础利率:" + Data.BaseInterestRate.ToString("P0"));
         SetText(cheatInterestText, "出千利率:" + Data.CheatInterestRate.ToString("P0"));
-        SetText(finalSettlementText, "最终结算金额:" + Data.FinalSettlementAmount);
+        SetText(finalSettlementText, FormatColoredValue("结算金额:", Data.FinalSettlementAmount.ToString(), FailAmountColor));
+    }
+
+    private void ResolveExternalComponents()
+    {
+        if (reStartBtn == null)
+            reStartBtn = GetComponentInChildren<Button>(true);
+
+        if (titleText == null)
+            titleText = FindTextByObjectName("Title");
+        if (totalScoreText == null)
+            totalScoreText = FindChildTextByContainerName("curScore");
+        if (baseInterestText == null)
+            baseInterestText = FindChildTextByContainerName("baseInterest");
+        if (cheatInterestText == null)
+            cheatInterestText = FindChildTextByContainerName("cheatInterest");
+        if (finalSettlementText == null)
+            finalSettlementText = FindChildTextByContainerName("lastScore");
+    }
+
+    private Text FindChildTextByContainerName(string objectName)
+    {
+        Transform target = FindTransformByName(transform, objectName);
+        return target != null ? target.GetComponentInChildren<Text>(true) : null;
+    }
+
+    private Text FindTextByObjectName(string objectName)
+    {
+        Transform target = FindTransformByName(transform, objectName);
+        return target != null ? target.GetComponent<Text>() : null;
+    }
+
+    private Transform FindTransformByName(Transform root, string objectName)
+    {
+        if (root == null)
+            return null;
+
+        if (root.name == objectName)
+            return root;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform result = FindTransformByName(root.GetChild(i), objectName);
+            if (result != null)
+                return result;
+        }
+
+        return null;
+    }
+
+    private string FormatColoredValue(string label, string value, string color)
+    {
+        return label + "<color=" + color + ">" + value + "</color>";
     }
 
     private void SetText(Text target, string value)
     {
-        if (target != null)
-            target.text = value;
+        if (target == null)
+            return;
+
+        target.supportRichText = true;
+        target.text = value;
     }
 }

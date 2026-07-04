@@ -245,6 +245,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   nextLevelBtn: {fileID: 0}
+  titleText: {fileID: 7865289003420680930}
+  totalScoreText: {fileID: 5360363599605505311}
+  baseInterestText: {fileID: 1488446375439378662}
+  cheatInterestText: {fileID: 6088833861729528522}
+  finalSettlementText: {fileID: 4520918666436011119}
 --- !u!1 &2230919543322797705
 GameObject:
   m_ObjectHideFlags: 0

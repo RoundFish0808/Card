@@ -70,7 +70,13 @@ public static class ScoreMultiplierRules
             .OrderBy(value => value)
             .ToList();
 
-        return values[1] == values[0] + 1 && values[2] == values[1] + 1;
+        if (values[1] == values[0] + 1 && values[2] == values[1] + 1)
+            return true;
+
+        // A can also be used as 1 for A-2-3.
+        return cards.Any(card => card.rank == Rank.Ace)
+            && values[0] == (int)Rank.Two
+            && values[1] == (int)Rank.Three;
     }
 
     private static int GetStraightValue(Rank rank)

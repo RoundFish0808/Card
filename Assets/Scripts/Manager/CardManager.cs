@@ -636,19 +636,20 @@ public class CardManager : MonoBehaviour
 
         OnTotalScoreChanged?.Invoke(playerTotalScore, npcTotalScore);
 
-        // NPC 三张牌全部被攻击后，按经济系统决定是否弹出阶段结算面板。
+        // NPC 三张牌全部被攻击后，按经济系统决定是否弹出结算面板。
         GameEconomyBridge economy = GameEconomyBridge.Instance;
-        if (economy != null && economy.IsBigGameEnded)
-        {
-            gameEnded = true;
-            if (battleField != null)
-                battleField.SetSlotsInteractable(false);
-            return;
-        }
-
         bool shouldPauseForPanel = economy == null || economy.ShouldPauseForSmallPanel;
         if (!shouldPauseForPanel)
         {
+            if (economy != null && economy.IsBigGameEnded)
+            {
+                gameEnded = true;
+                if (battleField != null)
+                    battleField.SetSlotsInteractable(false);
+                economy.ShowLatestBigPanelResult();
+                return;
+            }
+
             StartCoroutine(ContinueAfterSmallRoundDelay(smallRoundEndPanelDelay));
             return;
         }

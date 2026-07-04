@@ -1,4 +1,3 @@
-using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -48,38 +47,19 @@ public class smallEndPanel : BasePanel, ISmallEndPanelDataReceiver
             return;
         }
 
-        SetText(title, "\u7b2c" + data.SmallIndex + "\u5c0f\u5c40");
-        SetText(curScore, "\u5c0f\u5c40\u5f97\u5206:" + data.PlayerSmallScore);
-        SetText(curVigScore, "\u5c0f\u5c40\u5229\u7387:" + data.SmallInterestRate.ToString("P0"));
-        SetText(cardPatten, BuildCardPatternText(data));
+        SetText(title, string.Format("\u7b2c{0}\u5c0f\u5c40", data.SmallIndex));
+        SetText(curScore, string.Format("\u5c0f\u5c40\u5f97\u5206:{0}", data.PlayerSmallScore));
+        SetText(curVigScore, string.Format("\u5c0f\u5c40\u5229\u7387:{0}", data.SmallInterestRate.ToString("P0")));
+        SetText(cardPatten, string.Format("\u5c0f\u5c40\u724c\u578b:{0}", GetCurrentHandTypeName()));
     }
 
-    private string BuildCardPatternText(SmallPanelResultData resultData)
+    private string GetCurrentHandTypeName()
     {
-        StringBuilder builder = new StringBuilder();
-        builder.Append("\u5c0f\u5c40\u724c\u578b:");
+        if (data == null || data.RoundResults == null || data.RoundResults.Count <= 0)
+            return "-";
 
-        foreach (EconomyRoundResultData round in resultData.RoundResults)
-        {
-            builder.AppendLine();
-            builder.Append("\u7b2c");
-            builder.Append(round.RoundIndex);
-            builder.Append("\u56de\u5408 ");
-            builder.Append(string.IsNullOrEmpty(round.HandTypeName) ? "-" : round.HandTypeName);
-            builder.Append(" ");
-            builder.Append(round.PlayerScore);
-            builder.Append(" (");
-            builder.Append(round.PrincipalBeforeRound);
-            builder.Append("x");
-            builder.Append(round.FormulaBase);
-            builder.Append("x");
-            builder.Append(round.HandMultiplier.ToString("0.##"));
-            builder.Append(", diff ");
-            builder.Append(round.WinDiffScore);
-            builder.Append(")");
-        }
-
-        return builder.ToString();
+        string handTypeName = data.RoundResults[data.RoundResults.Count - 1].HandTypeName;
+        return string.IsNullOrEmpty(handTypeName) ? "-" : handTypeName;
     }
 
     private void SetText(Text target, string value)

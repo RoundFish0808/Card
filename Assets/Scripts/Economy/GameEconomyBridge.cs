@@ -16,7 +16,7 @@ public class GameEconomyBridge : MonoBehaviour
     public bool autoShowBigPanel = true;
 
     [Header("Round Rules")]
-    public int roundsPerSmallPanel = 3;
+    public int roundsPerSmallPanel = 1;
     public int roundsPerBigGame = 8;
 
     [Header("Economy Config")]
@@ -258,7 +258,7 @@ public class GameEconomyBridge : MonoBehaviour
 
     private bool ShouldCompleteSmallPanel()
     {
-        if (roundsPerSmallPanel <= 0 || CurrentRoundIndex >= roundsPerBigGame)
+        if (roundsPerSmallPanel <= 0 || IsBigGameEnded)
             return false;
 
         return pendingSmallPanelRounds.Count >= roundsPerSmallPanel;
@@ -282,18 +282,16 @@ public class GameEconomyBridge : MonoBehaviour
             return;
         }
 
-        int playerSmallScore = 0;
-        foreach (EconomyRoundResultData result in resultRounds)
-            playerSmallScore += result.PlayerScore;
+        int playerSmallScore = resultRounds[resultRounds.Count - 1].PlayerScore;
 
         LatestSmallPanelResult = new SmallPanelResultData(
             smallPanelResults.Count + 1,
-            resultRounds[0].RoundIndex,
+            resultRounds[resultRounds.Count - 1].RoundIndex,
             resultRounds[resultRounds.Count - 1].RoundIndex,
             playerSmallScore,
-            NpcEconomicScore,
-            TargetScore,
-            CurrentInterestRate,
+            resultRounds[resultRounds.Count - 1].NpcEconomicScoreAfterRound,
+            resultRounds[resultRounds.Count - 1].TargetScoreAfterRound,
+            resultRounds[resultRounds.Count - 1].InterestRateAfterRound,
             resultRounds.AsReadOnly());
 
         smallPanelResults.Add(LatestSmallPanelResult);
@@ -328,6 +326,14 @@ public class GameEconomyBridge : MonoBehaviour
 
         if (autoShowBigPanel)
             ShowPanelByName(IsPlayerWin ? bigSuccessPanelName : bigFailPanelName, LatestBigPanelResult);
+    }
+
+    public void ShowLatestBigPanelResult()
+    {
+        if (LatestBigPanelResult == null)
+            return;
+
+        ShowPanelByName(IsPlayerWin ? bigSuccessPanelName : bigFailPanelName, LatestBigPanelResult);
     }
 
     private float CalculateCurrentInterestRate()

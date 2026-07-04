@@ -325,10 +325,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   reStartBtn: {fileID: 0}
   titleText: {fileID: 947698751170594710}
-  totalScoreText: {fileID: 0}
-  baseInterestText: {fileID: 0}
-  cheatInterestText: {fileID: 0}
-  finalSettlementText: {fileID: 0}
+  totalScoreText: {fileID: 2932060691612540857}
+  baseInterestText: {fileID: 1989590154074572097}
+  cheatInterestText: {fileID: 2855819758263275764}
+  finalSettlementText: {fileID: 8397963807338094057}
 --- !u!1 &1599076324673414525
 GameObject:
   m_ObjectHideFlags: 0
