@@ -2612,11 +2612,13 @@ MonoBehaviour:
   battleField: {fileID: 0}
   attackSystem: {fileID: 0}
   enableGameFlow: 1
+  smallRoundEndPanelDelay: 2
   playerDrawPileTransform: {fileID: 0}
   drawToHandDuration: 0.45
   playerDrawPileObjectName: DeckCardPos
   useArcHand: 1
   cheatBtn: {fileID: 0}
+  cheatButton: {fileID: 0}
   _isCheatMode: 0
 --- !u!4 &2036997535
 Transform:
