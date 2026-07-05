@@ -68,6 +68,9 @@ public class SlotView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 
         Debug.Log($"PlaceCard {card.name} to Slot {slotIndex}");
 
+        // BATT04 放置卡牌出战音效（通道 1，不循环）
+        AudioManager.Instance?.Play(1, "CardPlace", false);
+
 
         CurrentCard = card;
         IsResolvedThisRound = false;

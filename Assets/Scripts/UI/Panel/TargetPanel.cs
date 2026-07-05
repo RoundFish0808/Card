@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
 
 public class TargetPanel : BasePanel
 {
@@ -11,6 +12,26 @@ public class TargetPanel : BasePanel
 
     public override void Init()
     {
+        StartCoroutine(WaitForEconomyAndInit());
+    }
+
+    private IEnumerator WaitForEconomyAndInit()
+    {
+        float waitTime = 0f;
+        Debug.Log("[TargetPanel] 开始等待 GameEconomyBridge 初始化...");
+
+        while (GameEconomyBridge.Instance == null)
+        {
+            waitTime += Time.deltaTime;
+            if (waitTime > 5f)
+            {
+                Debug.LogError("[TargetPanel] 等待 5 秒了 GameEconomyBridge.Instance 还是 null！经济系统没初始化成功！");
+                yield break;
+            }
+            yield return null;
+        }
+
+        Debug.Log($"[TargetPanel] 等到了 GameEconomyBridge，等了 {waitTime:F2} 秒，TargetScore={GameEconomyBridge.Instance.TargetScore}");
         TrySubscribe();
         Refresh();
     }
@@ -19,15 +40,6 @@ public class TargetPanel : BasePanel
     {
         if (subscribed && GameEconomyBridge.Instance != null)
             GameEconomyBridge.Instance.OnEconomyChanged -= Refresh;
-    }
-
-    private void LateUpdate()
-    {
-        if (subscribed)
-            return;
-
-        if (TrySubscribe())
-            Refresh();
     }
 
     private bool TrySubscribe()
@@ -58,7 +70,12 @@ public class TargetPanel : BasePanel
 
     private void SetText(Text target, string value)
     {
-        if (target != null)
-            target.text = value;
+        if (target == null)
+        {
+            Debug.LogError($"[TargetPanel] SetText 失败：target Text 为空！value={value}");
+            return;
+        }
+        target.text = value;
+        Debug.Log($"[TargetPanel] SetText 成功：{target.name} = {value}");
     }
 }

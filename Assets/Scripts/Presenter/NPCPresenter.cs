@@ -133,7 +133,12 @@ public class NPCPresenter : MonoBehaviour
         {
             string displayText = declaration.ToString();
             if (!string.IsNullOrEmpty(displayText))
+            {
                 declarationView.ShowDeclaration(displayText, displayTime);
+
+                // BATT03 查看AI宣言提示音效（通道 1，不循环）
+                AudioManager.Instance?.Play(1, "DeclarationView", false);
+            }
         }
 
         Debug.Log($"[NPC] 宣言生成 (难度={difficulty}, InfoLevel={infoLevel}): {declaration.PositionHint} | {declaration.ValueHint}");

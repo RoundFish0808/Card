@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
 
 public class smallEndPanel : BasePanel, ISmallEndPanelDataReceiver
 {
@@ -23,6 +24,14 @@ public class smallEndPanel : BasePanel, ISmallEndPanelDataReceiver
                 UIManager.Instance.HidePanel<smallEndPanel>();
             });
         }
+
+        StartCoroutine(WaitForDataAndApply());
+    }
+
+    private IEnumerator WaitForDataAndApply()
+    {
+        while (data == null && GameEconomyBridge.Instance == null)
+            yield return null;
 
         if (data == null && GameEconomyBridge.Instance != null)
             data = GameEconomyBridge.Instance.LatestSmallPanelResult;
@@ -64,7 +73,12 @@ public class smallEndPanel : BasePanel, ISmallEndPanelDataReceiver
 
     private void SetText(Text target, string value)
     {
-        if (target != null)
-            target.text = value;
+        if (target == null)
+        {
+            Debug.LogError($"[smallEndPanel] SetText 失败：target Text 为空！value={value}");
+            return;
+        }
+        target.text = value;
+        Debug.Log($"[smallEndPanel] SetText 成功：{target.name} = {value}");
     }
 }

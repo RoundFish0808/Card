@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 [DefaultExecutionOrder(-50)]
 [DisallowMultipleComponent]
@@ -74,6 +75,17 @@ public class GameEconomyBridge : MonoBehaviour
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void EnsureBridgeForLoadedScene()
+    {
+        TryCreateBridge();
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        TryCreateBridge();
+    }
+
+    private static void TryCreateBridge()
     {
         CardManager manager = UnityEngine.Object.FindObjectOfType<CardManager>();
         if (manager == null || UnityEngine.Object.FindObjectOfType<GameEconomyBridge>() != null)

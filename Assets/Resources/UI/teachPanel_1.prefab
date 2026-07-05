@@ -157,7 +157,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u89C4\u5219\u4ECB\u7ECD"
+  m_Text: "\u653E\u7F6E\u89C4\u5219"
 --- !u!1 &1872862262736337486
 GameObject:
   m_ObjectHideFlags: 0
@@ -632,7 +632,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.754717, g: 0.7369171, b: 0.7369171, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -652,7 +652,9 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u89C4\u5219\u4ECB\u7ECD"
+  m_Text: "\u653E\u7F6E\u9636\u6BB5\uFF1A \n\u6709\u7A7A\u69FD\u4F4D\u65F6\u4E3A\u653E\u7F6E\u6A21\u5F0F\uFF0C\u5C06\u624B\u724C\u62D6\u5230\u9AD8\u4EAE\u7684\u69FD\u4F4D\u5373\u53EF\u653E\u4E0B\n\n\u653B\u51FB\u9636\u6BB5\uFF1A
+    \n\u653E\u5B8C\u724C\u540E\u8FDB\u5165\u653B\u51FB\u6A21\u5F0F\uFF0C\u9009\u62E9\u4E00\u4E2A\u69FD\u4F4D\u5411\u5BF9\u624B\u53D1\u8D77\u653B\u51FB\n\u5DF2\u653E\u7F6E\u7684\u724C\u653E\u5165\u69FD\u4F4D\u7684\u5361\u724C\u65E0\u6CD5\u62FF\u56DE\uFF0C\u4E09\u6B21\u653B\u51FB\u7ED3\u675F\u56DE\u5408\n\nNPC
+    \u5BA3\u8A00\uFF1A \n\u51FA\u724C\u524D NPC \u4F1A\u5C55\u793A\u4E00\u53E5\"\u5BA3\u8A00\"\uFF0C\u6697\u793A\u5B83\u6700\u5F3A\u724C\u7684\u4F4D\u7F6E\u6216\u70B9\u6570\uFF0C\u8BB0\u5F97\u7559\u610F\uFF01"
 --- !u!1 &8356156102281790789
 GameObject:
   m_ObjectHideFlags: 0

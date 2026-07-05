@@ -148,6 +148,9 @@ public class HandPresenter : MonoBehaviour
 
         cardViews.Add(cardView);
         handController.AddCard(cardObj, false);
+
+        // BATT02 发牌音效（通道 1，不循环）
+        AudioManager.Instance?.Play(1, "CardDraw", false);
     }
 
     private System.Collections.IEnumerator DrawCardsAnimated(List<CardDataSO> cardDataList)
@@ -162,6 +165,9 @@ public class HandPresenter : MonoBehaviour
     private System.Collections.IEnumerator DrawCardAnimated(CardDataSO data)
     {
         if (cardPrefab == null || handController == null) yield break;
+
+        // BATT02 发牌音效（通道 1，不循环）
+        AudioManager.Instance?.Play(1, "CardDraw", false);
 
         GameObject cardObj = Instantiate(cardPrefab);
         RectTransform rect = cardObj.GetComponent<RectTransform>();
