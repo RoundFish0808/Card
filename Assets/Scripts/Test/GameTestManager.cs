@@ -354,6 +354,7 @@ public class GameTestManager : MonoBehaviour
 
     private void Test_Utils_ClearConsole()
     {
+#if UNITY_EDITOR
         var assembly = System.Reflection.Assembly.GetAssembly(typeof(UnityEditor.Editor));
         if (assembly == null) { Log("Cannot access UnityEditor", Color.yellow); return; }
 
@@ -366,6 +367,9 @@ public class GameTestManager : MonoBehaviour
 
         testOutput = "";
         Log("Console cleared");
+#else
+        Log("Clear Console is only available in the Unity Editor", Color.yellow);
+#endif
     }
 
     private void Test_Utils_ListSceneObjects()
