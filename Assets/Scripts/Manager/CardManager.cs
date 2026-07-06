@@ -154,7 +154,15 @@ public class CardManager : MonoBehaviour
 
     [Header("作弊按钮")]
     public Button cheatBtn;//[袁裕]这个按钮作为作弊按钮,配合设计一个作弊字段
-    public Button cheatButton;
+    public Image cheatUnusedImage;
+    public Image cheatUsedImage;
+    public Text cheatStateText;
+    public string cheatUnusedText = "No Cheat";
+    public string cheatUsedText = "Cheated";
+
+    [Header("NPC Image")]
+    public Image npcStateImage;
+    public Sprite[] npcRandomSprites;
     public bool IsCheatMode { get => _isCheatMode; }
    [SerializeField] private bool _isCheatMode = false;//[DRAIVORY]这个字段你需要借助,作为每一回合是否增加作弊利率的判断
 
@@ -250,6 +258,7 @@ public class CardManager : MonoBehaviour
 
         ResolveDrawPileTransform();
         RegisterCheatButton();
+        UpdateCheatStateUI();
 
         if (attackSystem != null)
         {
@@ -261,24 +270,21 @@ public class CardManager : MonoBehaviour
 
     private void RegisterCheatButton()
     {
-        if (cheatButton == null)
-            cheatButton = cheatBtn;
-
-        if (cheatButton == null)
+        if (cheatBtn == null)
         {
             GameObject buttonObj = GameObject.Find("cheatButton");
             if (buttonObj != null)
-                cheatButton = buttonObj.GetComponent<Button>();
+                cheatBtn = buttonObj.GetComponent<Button>();
         }
 
-        if (cheatButton == null)
+        if (cheatBtn == null)
         {
             Debug.LogWarning("CardManager 没有找到 cheatButton，作弊面板不会自动打开");
             return;
         }
 
-        cheatButton.onClick.RemoveListener(OpenCheatPanel);
-        cheatButton.onClick.AddListener(OpenCheatPanel);
+        cheatBtn.onClick.RemoveListener(OpenCheatPanel);
+        cheatBtn.onClick.AddListener(OpenCheatPanel);
     }
 
     private void OpenCheatPanel()
@@ -302,6 +308,34 @@ public class CardManager : MonoBehaviour
         }
 
         UIManager.Instance.ShowPanel<cheatPanel>();
+    }
+
+    private void UpdateCheatStateUI()
+    {
+        bool usedCheat = currentSmallRoundConfirmedCheat;
+
+        if (cheatUnusedImage != null)
+            cheatUnusedImage.gameObject.SetActive(!usedCheat);
+
+        if (cheatUsedImage != null)
+            cheatUsedImage.gameObject.SetActive(usedCheat);
+
+        if (cheatStateText != null)
+            cheatStateText.text = usedCheat ? cheatUsedText : cheatUnusedText;
+    }
+
+    private void RandomizeNpcImage()
+    {
+        if (npcStateImage == null || npcRandomSprites == null || npcRandomSprites.Length == 0)
+            return;
+
+        int randomIndex = UnityEngine.Random.Range(0, npcRandomSprites.Length);
+        Sprite selectedSprite = npcRandomSprites[randomIndex];
+        if (selectedSprite == null)
+            return;
+
+        npcStateImage.sprite = selectedSprite;
+        Debug.Log($"[NPC] 当前小局随机 NPC 图片索引：{randomIndex}");
     }
 
     private void ResolveDrawPileTransform()
@@ -432,7 +466,7 @@ public class CardManager : MonoBehaviour
 
         if (autoDeclareOnStart)
         {
-            npcPresenter.GenerateAndShowDeclaration(openingDeclarationDisplayTime);
+            npcPresenter.GenerateAndShowDeclaration(0f);
             Debug.Log("NPC 已根据开局手牌生成宣言并显示");
         }
 
@@ -488,6 +522,8 @@ public class CardManager : MonoBehaviour
         currentSmallRoundHasDrawnAttackReward = false;
         currentSmallRoundConfirmedCheat = false;
         smallRoundCheatUseCount = 0;
+        UpdateCheatStateUI();
+        RandomizeNpcImage();
 
         DrawNPCCards(NPCCardsPerSmallRound);
         ShowNPCCards();
@@ -737,6 +773,7 @@ public class CardManager : MonoBehaviour
         totalCheatUseCount = 0;
         currentSmallRoundConfirmedCheat = false;
         currentSmallRoundHasDrawnAttackReward = false;
+        UpdateCheatStateUI();
         discardPile.Clear();
         currentSmallRoundPlayerCards.Clear();
 
@@ -1041,6 +1078,7 @@ public class CardManager : MonoBehaviour
         AddCardToPlayerHand(selectedCard, true);
         ReturnCheatOptionsToDeck(options, selectedCard);
         currentSmallRoundConfirmedCheat = true;
+        UpdateCheatStateUI();
 
         Debug.Log($"[作弊] 玩家选择作弊牌：{selectedCard.cardName}，当前手牌数：{GetCurrentPlayerHandCount()}，剩余牌堆：{deck.Count}");
     }

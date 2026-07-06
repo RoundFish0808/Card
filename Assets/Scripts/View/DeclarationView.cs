@@ -45,6 +45,8 @@ public class DeclarationView : MonoBehaviour
 
     public void ShowDeclaration(string text, float displayTime = -1f)
     {
+        bool keepVisible = Mathf.Approximately(displayTime, 0f);
+
         if (displayTime < 0f)
             displayTime = defaultDisplayTime;
 
@@ -64,7 +66,8 @@ public class DeclarationView : MonoBehaviour
             {
                 StartCoroutine(TypewriterCoroutine(text, () =>
                 {
-                    DOVirtual.DelayedCall(displayTime, Hide);
+                    if (!keepVisible)
+                        DOVirtual.DelayedCall(displayTime, Hide);
                 }));
             });
         }
@@ -73,8 +76,11 @@ public class DeclarationView : MonoBehaviour
             if (declarationText != null)
                 declarationText.text = text;
 
-            currentSeq.AppendInterval(displayTime);
-            currentSeq.AppendCallback(Hide);
+            if (!keepVisible)
+            {
+                currentSeq.AppendInterval(displayTime);
+                currentSeq.AppendCallback(Hide);
+            }
         }
     }
 
